@@ -3,7 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle de Ponto Digital</title>
+    <title>Controle de Ponto Digital - Sistema Gratuito</title>
+    <meta name="description" content="Sistema gratuito de controle de ponto eletrônico. Registre suas horas trabalhadas, calcule salários e gere relatórios.">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="keywords" content="ponto eletrônico, controle de horas, calcular salário, registro de ponto">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Controle de Ponto Digital">
+    <meta property="og:description" content="Sistema gratuito para controle de ponto eletrônico">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
+    
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -65,7 +77,7 @@
         }
         .login-container {
             max-width: 400px;
-            margin: 100px auto;
+            margin: 50px auto;
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -80,15 +92,85 @@
             margin-top: 20px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+        
+        /* Melhorias para mobile */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .grid-cols-1, .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+                grid-template-columns: 1fr !important;
+            }
+            .flex-wrap {
+                flex-direction: column;
+            }
+            .month-tab {
+                margin-bottom: 5px;
+                text-align: center;
+                padding: 10px 5px;
+            }
+            .header-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .header-buttons button {
+                width: 100%;
+            }
+        }
+        
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: #10b981;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.error {
+            background: #ef4444;
+        }
+        .toast.warning {
+            background: #f59e0b;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
     <!-- Tela de Login -->
     <div id="loginScreen" class="login-container bg-white">
-        <h1 class="text-2xl font-bold text-center mb-6">Controle de Ponto Digital</h1>
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-blue-600">⏰ Controle de Ponto</h1>
+            <p class="text-gray-600 mt-2">Sistema gratuito de ponto eletrônico</p>
+        </div>
         
         <div id="loginForm">
-            <h2 class="text-xl font-bold mb-4">Login</h2>
+            <h2 class="text-xl font-bold mb-4 text-center">Login</h2>
             <div class="mb-4">
                 <label for="loginUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
                 <input type="text" id="loginUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
@@ -98,59 +180,77 @@
                 <input type="password" id="loginPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
             </div>
             <div class="mb-4">
-                <button id="loginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
-                    Entrar
+                <button id="loginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                    <span id="loginText">Entrar</span>
+                    <div id="loginLoading" class="loading hidden ml-2"></div>
                 </button>
             </div>
-            <p class="text-center">
+            <p class="text-center text-sm">
                 Não tem uma conta? 
-                <a href="#" id="showRegister" class="text-blue-500 hover:text-blue-700">Cadastre-se</a>
+                <a href="#" id="showRegister" class="text-blue-500 hover:text-blue-700 font-medium">Cadastre-se</a>
             </p>
         </div>
         
         <div id="registerForm" class="hidden">
-            <h2 class="text-xl font-bold mb-4">Cadastro</h2>
+            <h2 class="text-xl font-bold mb-4 text-center">Cadastro</h2>
             <div class="mb-4">
                 <label for="registerUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
-                <input type="text" id="registerUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                <input type="text" id="registerUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" required minlength="3">
+                <p class="text-xs text-gray-500 mt-1">Mínimo 3 caracteres</p>
             </div>
             <div class="mb-4">
                 <label for="registerPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha:</label>
-                <input type="password" id="registerPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                <input type="password" id="registerPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required minlength="4">
+                <p class="text-xs text-gray-500 mt-1">Mínimo 4 caracteres</p>
             </div>
             <div class="mb-4">
                 <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha:</label>
                 <input type="password" id="confirmPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
             </div>
             <div class="mb-4">
-                <button id="registerBtn" class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
-                    Cadastrar
+                <button id="registerBtn" class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                    <span id="registerText">Cadastrar</span>
+                    <div id="registerLoading" class="loading hidden ml-2"></div>
                 </button>
             </div>
-            <p class="text-center">
+            <p class="text-center text-sm">
                 Já tem uma conta? 
-                <a href="#" id="showLogin" class="text-blue-500 hover:text-blue-700">Faça login</a>
+                <a href="#" id="showLogin" class="text-blue-500 hover:text-blue-700 font-medium">Faça login</a>
             </p>
+        </div>
+
+        <!-- Informações do sistema -->
+        <div class="mt-8 p-4 bg-blue-50 rounded-lg">
+            <h3 class="font-bold text-blue-800 mb-2">💡 Como usar:</h3>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li>• Cadastre-se e faça login</li>
+                <li>• Registre seus horários de trabalho</li>
+                <li>• Configure o valor da sua hora/aula</li>
+                <li>• Acompanhe relatórios e cálculos automáticos</li>
+                <li>• Todos os dados ficam salvos no seu navegador</li>
+            </ul>
         </div>
     </div>
 
     <!-- Painel Administrativo -->
     <div id="adminScreen" class="container mx-auto px-4 py-8 hidden">
         <header class="mb-8">
-            <div class="flex justify-between items-center">
-                <h1 class="text-3xl font-bold text-gray-800">Painel Administrativo</h1>
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">⚙️ Painel Administrativo</h1>
+                    <p class="text-gray-600 mt-2">Gerenciamento de usuários do sistema</p>
+                </div>
                 <button id="adminLogoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
                     <i class="fas fa-sign-out-alt"></i> Sair
                 </button>
             </div>
-            <p class="text-gray-600 mt-2">Gerenciamento de usuários do sistema</p>
         </header>
 
         <div class="admin-panel">
-            <h2 class="text-xl font-bold mb-4">Gerenciar Usuários</h2>
+            <h2 class="text-xl font-bold mb-4">👥 Gerenciar Usuários</h2>
             
             <div class="mb-6">
-                <h3 class="font-medium mb-2">Alterar Senha do Admin</h3>
+                <h3 class="font-medium mb-2">🔐 Alterar Senha do Admin</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label for="currentPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha Atual:</label>
@@ -158,7 +258,7 @@
                     </div>
                     <div>
                         <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">Nova Senha:</label>
-                        <input type="password" id="newPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        <input type="password" id="newPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" minlength="4">
                     </div>
                     <div>
                         <label for="confirmNewPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Nova Senha:</label>
@@ -171,7 +271,7 @@
             </div>
             
             <div class="mb-6">
-                <h3 class="font-medium mb-2">Lista de Usuários</h3>
+                <h3 class="font-medium mb-2">📋 Lista de Usuários</h3>
                 <div class="overflow-x-auto">
                     <table class="w-full border-collapse">
                         <thead>
@@ -188,15 +288,15 @@
             </div>
             
             <div>
-                <h3 class="font-medium mb-2">Criar Novo Usuário</h3>
+                <h3 class="font-medium mb-2">➕ Criar Novo Usuário</h3>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                         <label for="newUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
-                        <input type="text" id="newUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        <input type="text" id="newUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" minlength="3">
                     </div>
                     <div>
                         <label for="newUserPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha:</label>
-                        <input type="password" id="newUserPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        <input type="password" id="newUserPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" minlength="4">
                     </div>
                     <div>
                         <label for="confirmNewUserPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha:</label>
@@ -214,12 +314,12 @@
     <div id="appScreen" class="container mx-auto px-4 py-8 hidden">
         <!-- Cabeçalho -->
         <header class="mb-8">
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center flex-wrap gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-gray-800">Controle de Ponto Digital</h1>
-                    <p class="text-gray-600 mt-2">Bem-vindo, <span id="userWelcome"></span>!</p>
+                    <h1 class="text-3xl font-bold text-gray-800">⏰ Controle de Ponto Digital</h1>
+                    <p class="text-gray-600 mt-2">Bem-vindo, <span id="userWelcome" class="font-semibold"></span>!</p>
                 </div>
-                <div class="flex space-x-4">
+                <div class="flex space-x-4 header-buttons">
                     <button id="darkModeToggle" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg no-print">
                         <i class="fas fa-moon"></i> Modo Escuro
                     </button>
@@ -291,18 +391,18 @@
         <!-- Abas dos meses -->
         <div class="mb-6 no-print">
             <div class="flex flex-wrap gap-2">
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="0">Janeiro</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="1">Fevereiro</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="2">Março</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="3">Abril</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="4">Maio</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="5">Junho</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="6">Julho</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="7">Agosto</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="8">Setembro</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="9">Outubro</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="10">Novembro</button>
-                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="11">Dezembro</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="0">Jan</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="1">Fev</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="2">Mar</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="3">Abr</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="4">Mai</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="5">Jun</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="6">Jul</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="7">Ago</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="8">Set</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="9">Out</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="10">Nov</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="11">Dez</button>
             </div>
         </div>
 
@@ -318,7 +418,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <!-- Formulário de registro -->
             <div class="bg-white rounded-lg shadow p-6 no-print">
-                <h2 class="text-xl font-bold mb-4">Registrar Ponto</h2>
+                <h2 class="text-xl font-bold mb-4">📝 Registrar Ponto</h2>
                 <form id="pontoForm">
                     <div class="mb-4">
                         <label for="data" class="block text-sm font-medium text-gray-700 mb-1">Data:</label>
@@ -370,11 +470,11 @@
                     
                     <div class="mb-4">
                         <label for="observacoes" class="block text-sm font-medium text-gray-700 mb-1">Observações (opcional):</label>
-                        <textarea id="observacoes" class="w-full border border-gray-300 rounded-lg px-3 py-2" rows="2"></textarea>
+                        <textarea id="observacoes" class="w-full border border-gray-300 rounded-lg px-3 py-2" rows="2" placeholder="Anotações sobre o dia..."></textarea>
                     </div>
                     
-                    <div class="flex justify-between">
-                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    <div class="flex justify-between gap-4">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex-1">
                             <i class="fas fa-save"></i> Salvar Registro
                         </button>
                         <button type="button" id="limparForm" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
@@ -386,22 +486,22 @@
 
             <!-- Configurações de salário por hora/aula -->
             <div class="bg-white rounded-lg shadow p-6 no-print">
-                <h2 class="text-xl font-bold mb-4">Configurações de Salário</h2>
+                <h2 class="text-xl font-bold mb-4">💰 Configurações de Salário</h2>
                 
                 <div class="mb-6">
                     <label for="valorHoraAula" class="block text-sm font-medium text-gray-700 mb-1">Valor da Hora/Aula (R$):</label>
                     <input type="number" id="valorHoraAula" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="50.00">
-                    <p class="text-xs text-gray-500 mt-1">Este valor será usado para calcular seu salário com base nas horas trabalhadas</p>
+                    <p class="text-xs text-gray-500 mt-1">Este valor será usado para calcular seu salário</p>
                 </div>
 
                 <div class="mb-4">
                     <label for="valorHoraExtra" class="block text-sm font-medium text-gray-700 mb-1">Valor da Hora Extra (%):</label>
                     <input type="number" id="valorHoraExtra" step="1" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="50">
-                    <p class="text-xs text-gray-500 mt-1">Percentual de acréscimo para horas extras (ex: 50% = 1.5x o valor normal)</p>
+                    <p class="text-xs text-gray-500 mt-1">Percentual de acréscimo para horas extras</p>
                 </div>
                 
                 <div class="mb-4">
-                    <h3 class="font-medium mb-2">Cálculo Automático</h3>
+                    <h3 class="font-medium mb-2">📊 Cálculo Automático</h3>
                     <div class="bg-gray-50 rounded-lg p-4">
                         <div class="flex justify-between mb-2">
                             <span>Total de Horas:</span>
@@ -422,7 +522,7 @@
                     </div>
                 </div>
                 
-                <h3 class="font-medium mb-2">Descontos Adicionais:</h3>
+                <h3 class="font-medium mb-2">📉 Descontos Adicionais:</h3>
                 <div id="descontosContainer" class="mb-4">
                     <!-- Descontos serão adicionados aqui -->
                 </div>
@@ -438,7 +538,7 @@
 
             <!-- Resumo e gráficos -->
             <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-bold mb-4">Resumo do Mês</h2>
+                <h2 class="text-xl font-bold mb-4">📈 Resumo do Mês</h2>
                 
                 <div class="grid grid-cols-2 gap-4 mb-6">
                     <div class="bg-blue-50 rounded-lg p-4">
@@ -466,7 +566,7 @@
 
         <!-- Gráfico Comparativo Anual -->
         <div class="bg-white rounded-lg shadow p-6 mt-8 no-print">
-            <h2 class="text-xl font-bold mb-4">Comparativo Anual</h2>
+            <h2 class="text-xl font-bold mb-4">📊 Comparativo Anual</h2>
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div>
                     <h3 class="font-medium mb-2">Horas Trabalhadas por Mês</h3>
@@ -481,7 +581,7 @@
 
         <!-- Tabela de registros -->
         <div class="bg-white rounded-lg shadow p-6 mt-8">
-            <h2 class="text-xl font-bold mb-4">Registros do Mês</h2>
+            <h2 class="text-xl font-bold mb-4">📋 Registros do Mês</h2>
             <div class="overflow-x-auto">
                 <table class="w-full border-collapse">
                     <thead>
@@ -533,6 +633,15 @@
         </div>
     </div>
 
+    <!-- Footer -->
+    <footer class="text-center py-6 text-gray-600 text-sm mt-8 no-print">
+        <div class="container mx-auto px-4">
+            <p>⏰ <strong>Controle de Ponto Digital</strong> - Sistema gratuito desenvolvido para facilitar o controle de horas trabalhadas</p>
+            <p class="mt-2">📊 Todos os dados são armazenados localmente no seu navegador • 🔒 Seus dados são privados e seguros</p>
+            <p class="mt-2">💡 Dica: Exporte seus dados regularmente para backup</p>
+        </div>
+    </footer>
+
     <script>
         // Variáveis globais
         let usuarios = {};
@@ -547,7 +656,29 @@
             carregarUsuarios();
             verificarLogin();
             configurarEventosLogin();
+            mostrarToast('Sistema carregado com sucesso!', 'success');
         });
+
+        // Função para mostrar notificações toast
+        function mostrarToast(mensagem, tipo = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = mensagem;
+            toast.className = 'toast';
+            
+            if (tipo === 'error') {
+                toast.classList.add('error');
+            } else if (tipo === 'warning') {
+                toast.classList.add('warning');
+            }
+            
+            toast.classList.remove('hidden');
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 3000);
+        }
 
         // Carregar usuários do localStorage
         function carregarUsuarios() {
@@ -557,8 +688,8 @@
             } else {
                 // Criar usuário admin padrão se não existir
                 usuarios = {
-                    'Admin': {
-                        senha: 'Admin',
+                    'admin': {
+                        senha: 'admin123',
                         isAdmin: true,
                         registros: {},
                         configSalario: {
@@ -577,7 +708,7 @@
             const usuarioLogado = localStorage.getItem('usuarioLogado');
             if (usuarioLogado) {
                 usuarioAtual = usuarioLogado;
-                if (usuarioAtual === 'Admin' && usuarios[usuarioAtual]?.isAdmin) {
+                if (usuarioAtual === 'admin' && usuarios[usuarioAtual]?.isAdmin) {
                     mostrarAdmin();
                 } else {
                     mostrarApp();
@@ -612,6 +743,8 @@
             atualizarCalculoAutomatico();
             atualizarDashboard();
             atualizarGraficosAnuais();
+            
+            mostrarToast(`Bem-vindo de volta, ${usuarioAtual}!`, 'success');
         }
 
         // Mostrar painel administrativo
@@ -622,6 +755,8 @@
             
             // Carregar lista de usuários
             carregarListaUsuarios();
+            
+            mostrarToast('Painel administrativo carregado', 'success');
         }
 
         // Configurar eventos de login/cadastro
@@ -641,71 +776,95 @@
             
             // Login
             document.getElementById('loginBtn').addEventListener('click', function() {
-                const username = document.getElementById('loginUsername').value;
+                const username = document.getElementById('loginUsername').value.trim();
                 const password = document.getElementById('loginPassword').value;
                 
                 if (!username || !password) {
-                    alert('Por favor, preencha todos os campos.');
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
                     return;
                 }
                 
-                if (usuarios[username] && usuarios[username].senha === password) {
-                    usuarioAtual = username;
-                    localStorage.setItem('usuarioLogado', username);
-                    
-                    if (username === 'Admin' && usuarios[username].isAdmin) {
-                        mostrarAdmin();
+                // Mostrar loading
+                document.getElementById('loginText').textContent = 'Entrando...';
+                document.getElementById('loginLoading').classList.remove('hidden');
+                
+                setTimeout(() => {
+                    if (usuarios[username] && usuarios[username].senha === password) {
+                        usuarioAtual = username;
+                        localStorage.setItem('usuarioLogado', username);
+                        
+                        if (username === 'admin' && usuarios[username].isAdmin) {
+                            mostrarAdmin();
+                        } else {
+                            mostrarApp();
+                        }
                     } else {
-                        mostrarApp();
+                        mostrarToast('Usuário ou senha incorretos.', 'error');
                     }
-                } else {
-                    alert('Usuário ou senha incorretos.');
-                }
+                    
+                    // Restaurar botão
+                    document.getElementById('loginText').textContent = 'Entrar';
+                    document.getElementById('loginLoading').classList.add('hidden');
+                }, 1000);
             });
             
             // Cadastro
             document.getElementById('registerBtn').addEventListener('click', function() {
-                const username = document.getElementById('registerUsername').value;
+                const username = document.getElementById('registerUsername').value.trim();
                 const password = document.getElementById('registerPassword').value;
                 const confirmPassword = document.getElementById('confirmPassword').value;
                 
                 if (!username || !password || !confirmPassword) {
-                    alert('Por favor, preencha todos os campos.');
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                if (!validarUsuario(username, password)) {
                     return;
                 }
                 
                 if (password !== confirmPassword) {
-                    alert('As senhas não coincidem.');
+                    mostrarToast('As senhas não coincidem.', 'error');
                     return;
                 }
                 
                 if (usuarios[username]) {
-                    alert('Este nome de usuário já está em uso.');
+                    mostrarToast('Este nome de usuário já está em uso.', 'error');
                     return;
                 }
                 
-                // Criar novo usuário
-                usuarios[username] = {
-                    senha: password,
-                    isAdmin: false,
-                    registros: {},
-                    configSalario: {
-                        valorHoraAula: '50.00',
-                        valorHoraExtra: '50',
-                        descontos: []
-                    }
-                };
+                // Mostrar loading
+                document.getElementById('registerText').textContent = 'Cadastrando...';
+                document.getElementById('registerLoading').classList.remove('hidden');
                 
-                localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
-                
-                alert('Usuário cadastrado com sucesso! Faça login para continuar.');
-                document.getElementById('registerForm').classList.add('hidden');
-                document.getElementById('loginForm').classList.remove('hidden');
-                
-                // Limpar formulário
-                document.getElementById('registerUsername').value = '';
-                document.getElementById('registerPassword').value = '';
-                document.getElementById('confirmPassword').value = '';
+                setTimeout(() => {
+                    // Criar novo usuário
+                    usuarios[username] = {
+                        senha: password,
+                        isAdmin: false,
+                        registros: {},
+                        configSalario: {
+                            valorHoraAula: '50.00',
+                            valorHoraExtra: '50',
+                            descontos: []
+                        }
+                    };
+                    
+                    localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+                    
+                    mostrarToast('Usuário cadastrado com sucesso! Faça login para continuar.', 'success');
+                    document.getElementById('registerForm').classList.add('hidden');
+                    document.getElementById('loginForm').classList.remove('hidden');
+                    
+                    // Limpar formulário
+                    document.getElementById('registerUsername').value = '';
+                    document.getElementById('registerPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                    
+                    // Restaurar botão
+                    document.getElementById('registerText').textContent = 'Cadastrar';
+                    document.getElementById('registerLoading').classList.add('hidden');
+                }, 1000);
             });
             
             // Logout
@@ -713,6 +872,7 @@
                 usuarioAtual = null;
                 localStorage.removeItem('usuarioLogado');
                 mostrarLogin();
+                mostrarToast('Logout realizado com sucesso', 'success');
             });
             
             // Logout do admin
@@ -720,7 +880,25 @@
                 usuarioAtual = null;
                 localStorage.removeItem('usuarioLogado');
                 mostrarLogin();
+                mostrarToast('Logout realizado com sucesso', 'success');
             });
+        }
+
+        // Validar usuário e senha
+        function validarUsuario(username, password) {
+            if (username.length < 3) {
+                mostrarToast('Usuário deve ter pelo menos 3 caracteres', 'error');
+                return false;
+            }
+            if (password.length < 4) {
+                mostrarToast('Senha deve ter pelo menos 4 caracteres', 'error');
+                return false;
+            }
+            if (username.toLowerCase() === 'admin' || username.toLowerCase() === 'administrador') {
+                mostrarToast('Este nome de usuário não é permitido', 'error');
+                return false;
+            }
+            return true;
         }
 
         // Carregar lista de usuários no painel administrativo
@@ -729,7 +907,7 @@
             usersList.innerHTML = '';
             
             Object.keys(usuarios).forEach(username => {
-                if (username === 'Admin') return; // Não mostrar o admin na lista
+                if (username === 'admin') return; // Não mostrar o admin na lista
                 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -747,33 +925,37 @@
             document.querySelectorAll('.excluir-usuario').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const username = this.getAttribute('data-username');
-                    if (confirm(`Tem certeza que deseja excluir o usuário ${username}?`)) {
+                    if (confirm(`Tem certeza que deseja excluir o usuário ${username}? Todos os dados serão perdidos.`)) {
                         delete usuarios[username];
                         localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
                         carregarListaUsuarios();
-                        alert('Usuário excluído com sucesso!');
+                        mostrarToast('Usuário excluído com sucesso!', 'success');
                     }
                 });
             });
             
             // Criar usuário
             document.getElementById('createUserBtn').addEventListener('click', function() {
-                const username = document.getElementById('newUsername').value;
+                const username = document.getElementById('newUsername').value.trim();
                 const password = document.getElementById('newUserPassword').value;
                 const confirmPassword = document.getElementById('confirmNewUserPassword').value;
                 
                 if (!username || !password || !confirmPassword) {
-                    alert('Por favor, preencha todos os campos.');
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                if (!validarUsuario(username, password)) {
                     return;
                 }
                 
                 if (password !== confirmPassword) {
-                    alert('As senhas não coincidem.');
+                    mostrarToast('As senhas não coincidem.', 'error');
                     return;
                 }
                 
                 if (usuarios[username]) {
-                    alert('Este nome de usuário já está em uso.');
+                    mostrarToast('Este nome de usuário já está em uso.', 'error');
                     return;
                 }
                 
@@ -791,7 +973,7 @@
                 
                 localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
                 
-                alert('Usuário criado com sucesso!');
+                mostrarToast('Usuário criado com sucesso!', 'success');
                 carregarListaUsuarios();
                 
                 // Limpar formulário
@@ -807,24 +989,29 @@
                 const confirmNewPassword = document.getElementById('confirmNewPassword').value;
                 
                 if (!currentPassword || !newPassword || !confirmNewPassword) {
-                    alert('Por favor, preencha todos os campos.');
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
                     return;
                 }
                 
-                if (currentPassword !== usuarios.Admin.senha) {
-                    alert('Senha atual incorreta.');
+                if (currentPassword !== usuarios.admin.senha) {
+                    mostrarToast('Senha atual incorreta.', 'error');
+                    return;
+                }
+                
+                if (newPassword.length < 4) {
+                    mostrarToast('A nova senha deve ter pelo menos 4 caracteres.', 'error');
                     return;
                 }
                 
                 if (newPassword !== confirmNewPassword) {
-                    alert('As novas senhas não coincidem.');
+                    mostrarToast('As novas senhas não coincidem.', 'error');
                     return;
                 }
                 
-                usuarios.Admin.senha = newPassword;
+                usuarios.admin.senha = newPassword;
                 localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
                 
-                alert('Senha alterada com sucesso!');
+                mostrarToast('Senha alterada com sucesso!', 'success');
                 
                 // Limpar formulário
                 document.getElementById('currentPassword').value = '';
@@ -832,6 +1019,10 @@
                 document.getElementById('confirmNewPassword').value = '';
             });
         }
+
+        // [As demais funções permanecem as mesmas do código anterior...]
+        // Carregar dados do usuário atual, salvar dados, inicializar anos, configurar eventos, etc.
+        // ... [todo o restante do código JavaScript permanece igual] ...
 
         // Carregar dados do usuário atual
         function carregarDadosUsuario() {
@@ -857,12 +1048,15 @@
             }
             
             // Ativar aba do mês atual
-            document.querySelector(`.month-tab[data-month="${mesAtual}"]`).classList.add('tab-active');
+            const tabAtual = document.querySelector(`.month-tab[data-month="${mesAtual}"]`);
+            if (tabAtual) {
+                document.querySelectorAll('.month-tab').forEach(t => t.classList.remove('tab-active'));
+                tabAtual.classList.add('tab-active');
+            }
             
-            // Definir data atual no formulário - CORREÇÃO DO PROBLEMA DE DATA
+            // Definir data atual no formulário
             const hoje = new Date();
-            // Ajustar para o fuso horário local
-            const dataFormatada = hoje.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+            const dataFormatada = hoje.toLocaleDateString('en-CA');
             document.getElementById('data').value = dataFormatada;
         }
 
@@ -893,11 +1087,26 @@
             };
             
             localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+            
+            // Fazer backup automático
+            fazerBackupAutomatico();
+        }
+
+        // Backup automático
+        function fazerBackupAutomatico() {
+            const hoje = new Date().toISOString().split('T')[0];
+            const backupKey = `backup_${usuarioAtual}_${hoje}`;
+            
+            if (!localStorage.getItem(backupKey)) {
+                const dadosUsuario = JSON.stringify(usuarios[usuarioAtual]);
+                localStorage.setItem(backupKey, dadosUsuario);
+            }
         }
 
         // Inicializar seletor de anos
         function inicializarAnos() {
             const yearSelect = document.getElementById('yearSelect');
+            yearSelect.innerHTML = '';
             const currentYear = new Date().getFullYear();
             
             for (let i = currentYear - 5; i <= currentYear + 5; i++) {
@@ -943,12 +1152,11 @@
             // Limpar formulário
             document.getElementById('limparForm').addEventListener('click', function() {
                 document.getElementById('pontoForm').reset();
-                // Limpar horários adicionais
                 document.getElementById('horariosAdicionais').innerHTML = '';
-                // Definir data atual - CORREÇÃO DO PROBLEMA DE DATA
                 const hoje = new Date();
-                const dataFormatada = hoje.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+                const dataFormatada = hoje.toLocaleDateString('en-CA');
                 document.getElementById('data').value = dataFormatada;
+                mostrarToast('Formulário limpo', 'success');
             });
             
             // Adicionar horário adicional
@@ -974,7 +1182,6 @@
                 atualizarGraficosAnuais();
             });
 
-            // Atualizar cálculo automático quando valor da hora extra mudar
             document.getElementById('valorHoraExtra').addEventListener('input', function() {
                 atualizarCalculoAutomatico();
                 salvarDadosUsuario();
@@ -1030,10 +1237,10 @@
             novoDesconto.className = 'desconto-item grid grid-cols-3 gap-4 mb-2';
             novoDesconto.innerHTML = `
                 <div class="col-span-2">
-                    <input type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 desconto-descricao" placeholder="Descrição" value="${descricao}">
+                    <input type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 desconto-descricao" placeholder="Descrição do desconto" value="${descricao}">
                 </div>
                 <div class="flex">
-                    <input type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 desconto-valor" placeholder="Valor" value="${valor}">
+                    <input type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 desconto-valor" placeholder="Valor R$" value="${valor}">
                     <button type="button" class="ml-2 bg-red-500 hover:bg-red-600 text-white px-2 rounded remover-desconto">
                         <i class="fas fa-times"></i>
                     </button>
@@ -1041,13 +1248,12 @@
             `;
             descontosContainer.appendChild(novoDesconto);
             
-            // Adicionar evento para remover desconto
             novoDesconto.querySelector('.remover-desconto').addEventListener('click', function() {
                 novoDesconto.remove();
                 salvarDadosUsuario();
+                mostrarToast('Desconto removido', 'success');
             });
             
-            // Adicionar evento para salvar ao alterar
             novoDesconto.querySelectorAll('input').forEach(input => {
                 input.addEventListener('input', function() {
                     salvarDadosUsuario();
@@ -1064,9 +1270,12 @@
             const intervaloRetorno = document.getElementById('intervaloRetorno').value;
             const observacoes = document.getElementById('observacoes').value;
             
-            // CORREÇÃO DO PROBLEMA DE DATA - Converter para o formato correto
+            if (!entrada || !saida) {
+                mostrarToast('Preencha pelo menos entrada e saída principais', 'error');
+                return;
+            }
+            
             const dataObj = new Date(data);
-            // Ajustar para o fuso horário local
             const dataCorrigida = new Date(dataObj.getTime() + dataObj.getTimezoneOffset() * 60000);
             const dataFormatada = dataCorrigida.toISOString().split('T')[0];
             
@@ -1103,7 +1312,6 @@
                 registros[anoAtual][mesAtual] = {};
             }
             
-            // Usar a data corrigida
             registros[anoAtual][mesAtual][dataFormatada] = registro;
             
             // Salvar dados do usuário
@@ -1120,13 +1328,16 @@
             document.getElementById('pontoForm').reset();
             document.getElementById('horariosAdicionais').innerHTML = '';
             
-            // Definir data atual - CORREÇÃO DO PROBLEMA DE DATA
+            // Definir data atual
             const hoje = new Date();
-            const hojeFormatada = hoje.toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+            const hojeFormatada = hoje.toLocaleDateString('en-CA');
             document.getElementById('data').value = hojeFormatada;
             
-            alert('Registro salvo com sucesso!');
+            mostrarToast('Registro salvo com sucesso!', 'success');
         }
+
+        // [As demais funções de cálculo, tabelas, gráficos, etc. permanecem as mesmas...]
+        // ... [restante do código JavaScript] ...
 
         // Atualizar tabela de registros
         function atualizarTabela() {
@@ -1134,6 +1345,9 @@
             tbody.innerHTML = '';
             
             if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="8" class="border border-gray-300 px-4 py-4 text-center text-gray-500">Nenhum registro encontrado para este mês</td>`;
+                tbody.appendChild(tr);
                 return;
             }
             
@@ -1148,7 +1362,6 @@
                 const dataObj = new Date(data);
                 const semana = getWeekNumber(dataObj);
                 
-                // Se mudou de semana, reiniciar o total semanal
                 if (semana !== semanaAtual) {
                     totalSemanal = 0;
                     semanaAtual = semana;
@@ -1163,12 +1376,10 @@
                 const tr = document.createElement('tr');
                 tr.className = 'time-entry';
                 
-                // Destacar se excedeu 8 horas
                 if (totalDiario > 8 * 60 * 60 * 1000) {
                     tr.classList.add('exceeded');
                 }
                 
-                // Formatar horários
                 let horariosFormatados = `${registro.entrada} - ${registro.saida}`;
                 
                 if (registro.intervaloSaida && registro.intervaloRetorno) {
@@ -1181,7 +1392,6 @@
                     });
                 }
                 
-                // CORREÇÃO DO PROBLEMA DE DATA - Formatar data corretamente
                 const dataFormatada = formatarData(data);
                 
                 tr.innerHTML = `
@@ -1201,7 +1411,6 @@
                 
                 tbody.appendChild(tr);
                 
-                // Adicionar evento para excluir registro
                 tr.querySelector('.excluir-registro').addEventListener('click', function() {
                     const dataRegistro = this.getAttribute('data-data');
                     if (confirm('Tem certeza que deseja excluir este registro?')) {
@@ -1212,13 +1421,12 @@
                         atualizarCalculoAutomatico();
                         atualizarDashboard();
                         atualizarGraficosAnuais();
+                        mostrarToast('Registro excluído com sucesso', 'success');
                     }
                 });
                 
-                // Verificar se é o último dia da semana ou do mês
                 const proximaData = datas[index + 1];
                 if (!proximaData || getWeekNumber(new Date(proximaData)) !== semana) {
-                    // Inserir linha de total semanal
                     const trTotal = document.createElement('tr');
                     trTotal.className = 'bg-gray-100 font-bold';
                     trTotal.innerHTML = `
@@ -1234,9 +1442,6 @@
                 }
             });
         }
-
-        // As demais funções permanecem as mesmas (atualizarResumo, atualizarCalculoAutomatico, etc.)
-        // ... [código das demais funções permanece igual] ...
 
         // Atualizar resumo do mês
         function atualizarResumo() {
@@ -1270,7 +1475,6 @@
             document.getElementById('totalHoras').textContent = formatarTempo(totalHoras);
             document.getElementById('salarioLiquido').textContent = `R$ ${salarioLiquido.toFixed(2)}`;
             
-            // Atualizar gráfico de horas semanais
             atualizarGraficoHorasSemanais();
         }
 
@@ -1335,7 +1539,6 @@
                 totalHoras += totalDiario;
                 totalHorasExtras += horasExtras;
                 
-                // Adicionar semana ao conjunto
                 semanas.add(getWeekNumber(new Date(data)));
             });
             
@@ -1356,7 +1559,7 @@
         // Calcular salário completo
         function calcularSalarioCompleto() {
             if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
-                alert('Não há registros para calcular o salário.');
+                mostrarToast('Não há registros para calcular o salário.', 'warning');
                 return;
             }
             
@@ -1381,7 +1584,6 @@
             const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
             const salarioLiquido = calcularSalarioLiquido(salarioBruto);
             
-            // Calcular descontos
             let totalDescontos = 0;
             document.querySelectorAll('.desconto-item').forEach(item => {
                 const valor = parseFloat(item.querySelector('.desconto-valor').value) || 0;
@@ -1390,15 +1592,14 @@
             
             const salarioFinal = salarioLiquido - totalDescontos;
             
-            // Exibir resultado
-            let mensagem = `RESUMO DO SALÁRIO\n\n`;
-            mensagem += `Total de Horas: ${formatarTempo(totalHoras)}\n`;
-            mensagem += `Horas Extras: ${formatarTempo(totalHorasExtras)}\n`;
-            mensagem += `Valor Hora/Aula: R$ ${valorHoraAula.toFixed(2)}\n`;
-            mensagem += `Salário Bruto: R$ ${salarioBruto.toFixed(2)}\n`;
-            mensagem += `Salário Líquido: R$ ${salarioLiquido.toFixed(2)}\n`;
-            mensagem += `Descontos: R$ ${totalDescontos.toFixed(2)}\n`;
-            mensagem += `SALÁRIO FINAL: R$ ${salarioFinal.toFixed(2)}`;
+            let mensagem = `💰 RESUMO DO SALÁRIO\n\n`;
+            mensagem += `⏰ Total de Horas: ${formatarTempo(totalHoras)}\n`;
+            mensagem += `⚡ Horas Extras: ${formatarTempo(totalHorasExtras)}\n`;
+            mensagem += `💵 Valor Hora/Aula: R$ ${valorHoraAula.toFixed(2)}\n`;
+            mensagem += `📊 Salário Bruto: R$ ${salarioBruto.toFixed(2)}\n`;
+            mensagem += `💸 Salário Líquido: R$ ${salarioLiquido.toFixed(2)}\n`;
+            mensagem += `📉 Descontos: R$ ${totalDescontos.toFixed(2)}\n`;
+            mensagem += `🎯 SALÁRIO FINAL: R$ ${salarioFinal.toFixed(2)}`;
             
             alert(mensagem);
         }
@@ -1412,7 +1613,6 @@
             const registrosMes = registros[anoAtual][mesAtual];
             const datas = Object.keys(registrosMes).sort();
             
-            // Agrupar por semana
             const horasPorSemana = {};
             
             datas.forEach(data => {
@@ -1427,13 +1627,11 @@
                 horasPorSemana[semana] += totalDiario;
             });
             
-            // Preparar dados para o gráfico
             const semanas = Object.keys(horasPorSemana);
-            const horas = semanas.map(semana => horasPorSemana[semana] / (60 * 60 * 1000)); // Converter para horas
+            const horas = semanas.map(semana => horasPorSemana[semana] / (60 * 60 * 1000));
             
             const ctx = document.getElementById('horasSemanaisChart').getContext('2d');
             
-            // Destruir gráfico anterior se existir
             if (window.horasSemanaisChart) {
                 window.horasSemanaisChart.destroy();
             }
@@ -1471,7 +1669,6 @@
                 return;
             }
             
-            // Preparar dados para gráfico de horas mensais
             const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
             const horasMensais = [];
             const salariosMensais = [];
@@ -1497,7 +1694,7 @@
                     });
                 }
                 
-                horasMensais.push(totalHoras / (60 * 60 * 1000)); // Converter para horas
+                horasMensais.push(totalHoras / (60 * 60 * 1000));
                 
                 const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
                 const salarioLiquido = calcularSalarioLiquido(salarioBruto);
@@ -1576,14 +1773,13 @@
         // Imprimir relatório
         function imprimirRelatorio() {
             if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
-                alert('Não há registros para gerar relatório.');
+                mostrarToast('Não há registros para gerar relatório.', 'warning');
                 return;
             }
             
             const registrosMes = registros[anoAtual][mesAtual];
             const datas = Object.keys(registrosMes).sort();
             
-            // Atualizar conteúdo do relatório
             document.getElementById('periodoRelatorio').textContent = 
                 `Período: ${getNomeMes(mesAtual)} de ${anoAtual}`;
             
@@ -1600,7 +1796,6 @@
                 const dataObj = new Date(data);
                 const semana = getWeekNumber(dataObj);
                 
-                // Se mudou de semana, reiniciar o total semanal
                 if (semana !== semanaAtual) {
                     totalSemanal = 0;
                     semanaAtual = semana;
@@ -1614,7 +1809,6 @@
                 totalHorasExtras += horasExtras;
                 totalSemanal += totalDiario;
                 
-                // Formatar horários
                 let horariosFormatados = `${registro.entrada} - ${registro.saida}`;
                 
                 if (registro.intervaloSaida && registro.intervaloRetorno) {
@@ -1627,7 +1821,6 @@
                     });
                 }
                 
-                // CORREÇÃO DO PROBLEMA DE DATA - Formatar data corretamente
                 const dataFormatada = formatarData(data);
                 
                 const tr = document.createElement('tr');
@@ -1642,10 +1835,8 @@
                 
                 tbody.appendChild(tr);
                 
-                // Verificar se é o último dia da semana ou do mês
                 const proximaData = datas[index + 1];
                 if (!proximaData || getWeekNumber(new Date(proximaData)) !== semana) {
-                    // Inserir linha de total semanal
                     const trTotal = document.createElement('tr');
                     trTotal.className = 'bg-gray-200 font-bold';
                     trTotal.innerHTML = `
@@ -1659,7 +1850,6 @@
                 }
             });
             
-            // Atualizar resumo financeiro
             const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
             const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
             
@@ -1672,14 +1862,13 @@
             document.getElementById('relatorioSalarioBruto').textContent = `R$ ${salarioBruto.toFixed(2)}`;
             document.getElementById('relatorioSalarioLiquido').textContent = `R$ ${salarioLiquido.toFixed(2)}`;
             
-            // Imprimir
             window.print();
         }
 
         // Exportar dados
         function exportarDados() {
             if (!usuarioAtual || !usuarios[usuarioAtual]) {
-                alert('Não há dados para exportar.');
+                mostrarToast('Não há dados para exportar.', 'warning');
                 return;
             }
             
@@ -1687,7 +1876,8 @@
             const dadosExportar = {
                 usuario: usuarioAtual,
                 registros: dadosUsuario.registros,
-                configSalario: dadosUsuario.configSalario
+                configSalario: dadosUsuario.configSalario,
+                dataExportacao: new Date().toISOString()
             };
             
             const dadosJSON = JSON.stringify(dadosExportar, null, 2);
@@ -1701,6 +1891,8 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            
+            mostrarToast('Dados exportados com sucesso!', 'success');
         }
 
         // Importar dados
@@ -1713,18 +1905,19 @@
                     const dadosImportar = JSON.parse(e.target.result);
                     
                     if (dadosImportar.usuario !== usuarioAtual) {
-                        alert('Este arquivo não pertence ao usuário atual.');
+                        mostrarToast('Este arquivo não pertence ao usuário atual.', 'error');
                         return;
                     }
                     
-                    // Atualizar dados do usuário
+                    if (!confirm('Isso substituirá todos os seus dados atuais. Continuar?')) {
+                        return;
+                    }
+                    
                     usuarios[usuarioAtual].registros = dadosImportar.registros;
                     usuarios[usuarioAtual].configSalario = dadosImportar.configSalario;
                     
-                    // Salvar no localStorage
                     localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
                     
-                    // Recarregar dados
                     carregarDadosUsuario();
                     atualizarTabela();
                     atualizarResumo();
@@ -1732,9 +1925,9 @@
                     atualizarDashboard();
                     atualizarGraficosAnuais();
                     
-                    alert('Dados importados com sucesso!');
+                    mostrarToast('Dados importados com sucesso!', 'success');
                 } catch (erro) {
-                    alert('Erro ao importar dados. Verifique se o arquivo é válido.');
+                    mostrarToast('Erro ao importar dados. Verifique se o arquivo é válido.', 'error');
                     console.error(erro);
                 }
             };
@@ -1748,31 +1941,32 @@
             if (darkMode) {
                 document.body.classList.add('dark-mode');
                 document.getElementById('darkModeToggle').innerHTML = '<i class="fas fa-sun"></i> Modo Claro';
+                mostrarToast('Modo escuro ativado', 'success');
             } else {
                 document.body.classList.remove('dark-mode');
                 document.getElementById('darkModeToggle').innerHTML = '<i class="fas fa-moon"></i> Modo Escuro';
+                mostrarToast('Modo claro ativado', 'success');
             }
+            
+            localStorage.setItem('darkMode', darkMode);
         }
 
         // Funções auxiliares
         function calcularTotalDiario(registro) {
             let total = 0;
             
-            // Período principal
             if (registro.entrada && registro.saida) {
                 const entrada = new Date(`2000-01-01T${registro.entrada}`);
                 const saida = new Date(`2000-01-01T${registro.saida}`);
                 total += saida - entrada;
             }
             
-            // Intervalo (subtrair)
             if (registro.intervaloSaida && registro.intervaloRetorno) {
                 const saidaIntervalo = new Date(`2000-01-01T${registro.intervaloSaida}`);
                 const retornoIntervalo = new Date(`2000-01-01T${registro.intervaloRetorno}`);
                 total -= (retornoIntervalo - saidaIntervalo);
             }
             
-            // Horários adicionais
             if (registro.horariosAdicionais) {
                 registro.horariosAdicionais.forEach(horario => {
                     if (horario.entrada && horario.saida) {
@@ -1787,7 +1981,7 @@
         }
 
         function calcularHorasExtras(totalDiario) {
-            const jornadaPadrao = 8 * 60 * 60 * 1000; // 8 horas em milissegundos
+            const jornadaPadrao = 8 * 60 * 60 * 1000;
             return Math.max(0, totalDiario - jornadaPadrao);
         }
 
@@ -1811,25 +2005,19 @@
         }
 
         function calcularSalarioLiquido(salarioBruto) {
-            // Simulação de descontos (INSS, IRRF, etc.)
-            // Na prática, esses cálculos seriam mais complexos
-            const inss = salarioBruto * 0.11; // 11% de INSS
-            const irrf = Math.max(0, salarioBruto - inss - 1903.98) * 0.075; // 7.5% de IRRF
-            
+            const inss = salarioBruto * 0.11;
+            const irrf = Math.max(0, salarioBruto - inss - 1903.98) * 0.075;
             return salarioBruto - inss - irrf;
         }
 
         function formatarTempo(milissegundos) {
             const horas = Math.floor(milissegundos / (1000 * 60 * 60));
             const minutos = Math.floor((milissegundos % (1000 * 60 * 60)) / (1000 * 60));
-            
             return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
         }
 
-        // CORREÇÃO DO PROBLEMA DE DATA - Formatar data corretamente
         function formatarData(dataString) {
             const data = new Date(dataString);
-            // Ajustar para o fuso horário local
             const dataCorrigida = new Date(data.getTime() + data.getTimezoneOffset() * 60000);
             return dataCorrigida.toLocaleDateString('pt-BR');
         }
@@ -1850,6 +2038,14 @@
                 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
             ];
             return meses[mes];
+        }
+
+        // Verificar modo escuro salvo
+        const darkModeSalvo = localStorage.getItem('darkMode');
+        if (darkModeSalvo === 'true') {
+            darkMode = true;
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeToggle').innerHTML = '<i class="fas fa-sun"></i> Modo Claro';
         }
     </script>
 </body>
