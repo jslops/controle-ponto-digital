@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Ponto Digital - Sistema Gratuito</title>
+    <meta name="description" content="Sistema gratuito de controle de ponto eletrônico. Registre suas horas trabalhadas, calcule salários e gere relatórios.">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="keywords" content="ponto eletrônico, controle de horas, calcular salário, registro de ponto">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Controle de Ponto Digital">
+    <meta property="og:description" content="Sistema gratuito para controle de ponto eletrônico">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
+    
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Incluir Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        .tab-active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .exceeded {
+            background-color: #fee2e2;
+        }
+        .print-only {
+            display: none;
+        }
+        .dashboard-card {
+            transition: all 0.3s ease;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .time-entry {
+            transition: all 0.3s ease;
+        }
+        .time-entry:hover {
+            background-color: #f8fafc;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block;
+            }
+            body {
+                font-size: 12px;
+            }
+            .container {
+                max-width: 100% !important;
+            }
+        }
+        .dark-mode {
+            background-color: #1f2937;
+            color: #f9fafb;
+        }
+        .dark-mode .bg-white {
+            background-color: #374151;
+        }
+        .dark-mode .bg-gray-100 {
+            background-color: #4b5563;
+        }
+        .dark-mode .border-gray-300 {
+            border-color: #6b7280;
+        }
+        .dark-mode input, .dark-mode select {
+            background-color: #4b5563;
+            color: #f9fafb;
+            border-color: #6b7280;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .hidden {
+            display: none;
+        }
+        .admin-panel {
+            background-color: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Melhorias para mobile */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .grid-cols-1, .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+                grid-template-columns: 1fr !important;
+            }
+            .flex-wrap {
+                flex-direction: column;
+            }
+            .month-tab {
+                margin-bottom: 5px;
+                text-align: center;
+                padding: 10px 5px;
+            }
+            .header-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .header-buttons button {
+                width: 100%;
+            }
+        }
+        
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: #10b981;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.error {
+            background: #ef4444;
+        }
+        .toast.warning {
+            background: #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Tela de Login -->
+    <div id="loginScreen" class="login-container bg-white">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-blue-600">⏰ Controle de Ponto</h1>
+            <p class="text-gray-600 mt-2">Sistema gratuito de ponto eletrônico</p>
+        </div>
+        
+        <div id="loginForm">
+            <h2 class="text-xl font-bold mb-4 text-center">Login</h2>
+            <div class="mb-4">
+                <label for="loginUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
+                <input type="text" id="loginUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+            </div>
+            <div class="mb-4">
+                <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha:</label>
+                <input type="password" id="loginPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+            </div>
+            <div class="mb-4">
+                <button id="loginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                    <span id="loginText">Entrar</span>
+                    <div id="loginLoading" class="loading hidden ml-2"></div>
+                </button>
+            </div>
+            <p class="text-center text-sm">
+                Não tem uma conta? 
+                <a href="#" id="showRegister" class="text-blue-500 hover:text-blue-700 font-medium">Cadastre-se</a>
+            </p>
+        </div>
+        
+        <div id="registerForm" class="hidden">
+            <h2 class="text-xl font-bold mb-4 text-center">Cadastro</h2>
+            <div class="mb-4">
+                <label for="registerUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
+                <input type="text" id="registerUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" required minlength="3">
+                <p class="text-xs text-gray-500 mt-1">Mínimo 3 caracteres</p>
+            </div>
+            <div class="mb-4">
+                <label for="registerPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha:</label>
+                <input type="password" id="registerPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required minlength="4">
+                <p class="text-xs text-gray-500 mt-1">Mínimo 4 caracteres</p>
+            </div>
+            <div class="mb-4">
+                <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha:</label>
+                <input type="password" id="confirmPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+            </div>
+            <div class="mb-4">
+                <button id="registerBtn" class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                    <span id="registerText">Cadastrar</span>
+                    <div id="registerLoading" class="loading hidden ml-2"></div>
+                </button>
+            </div>
+            <p class="text-center text-sm">
+                Já tem uma conta? 
+                <a href="#" id="showLogin" class="text-blue-500 hover:text-blue-700 font-medium">Faça login</a>
+            </p>
+        </div>
+
+        <!-- Informações do sistema -->
+        <div class="mt-8 p-4 bg-blue-50 rounded-lg">
+            <h3 class="font-bold text-blue-800 mb-2">💡 Como usar:</h3>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li>• Cadastre-se e faça login</li>
+                <li>• Registre seus horários de trabalho</li>
+                <li>• Configure o valor da sua hora/aula</li>
+                <li>• Acompanhe relatórios e cálculos automáticos</li>
+                <li>• Todos os dados ficam salvos na nuvem</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Sistema de Controle de Ponto (após login) -->
+    <div id="appScreen" class="container mx-auto px-4 py-8 hidden">
+        <!-- Cabeçalho -->
+        <header class="mb-8">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">⏰ Controle de Ponto Digital</h1>
+                    <p class="text-gray-600 mt-2">Bem-vindo, <span id="userWelcome" class="font-semibold"></span>!</p>
+                </div>
+                <div class="flex space-x-4 header-buttons">
+                    <button id="darkModeToggle" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-moon"></i> Modo Escuro
+                    </button>
+                    <button id="exportBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-sign-out-alt"></i> Sair
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Resumo -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 no-print">
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-clock text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Horas Este Mês</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardHorasMes">00:00</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-green-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-money-bill-wave text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Salário Este Mês</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardSalarioMes">R$ 0,00</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-purple-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Média Horas/Semana</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardMediaSemanal">00:00</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-orange-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-bolt text-orange-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Horas Extras</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardHorasExtras">00:00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Abas dos meses -->
+        <div class="mb-6 no-print">
+            <div class="flex flex-wrap gap-2">
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="0">Jan</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="1">Fev</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="2">Mar</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="3">Abr</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="4">Mai</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="5">Jun</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="6">Jul</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="7">Ago</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="8">Set</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="9">Out</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="10">Nov</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="11">Dez</button>
+            </div>
+        </div>
+
+        <!-- Ano selecionado -->
+        <div class="mb-6 no-print">
+            <label for="yearSelect" class="block text-sm font-medium text-gray-700 mb-1">Ano:</label>
+            <select id="yearSelect" class="border border-gray-300 rounded-lg px-4 py-2 w-32">
+                <!-- Opções de ano serão preenchidas via JavaScript -->
+            </select>
+        </div>
+
+        <!-- Conteúdo principal -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Formulário de registro -->
+            <div class="bg-white rounded-lg shadow p-6 no-print">
+                <h2 class="text-xl font-bold mb-4">📝 Registrar Ponto</h2>
+                <form id="pontoForm">
+                    <div class="mb-4">
+                        <label for="data" class="block text-sm font-medium text-gray-700 mb-1">Data:</label>
+                        <input type="date" id="data" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                    </div>
+                    
+                    <!-- Entradas e Saídas Principais -->
+                    <div class="mb-4">
+                        <h3 class="font-medium mb-2 text-gray-700">Período Principal</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="entrada" class="block text-sm font-medium text-gray-700 mb-1">Entrada:</label>
+                                <input type="time" id="entrada" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                            </div>
+                            <div>
+                                <label for="saida" class="block text-sm font-medium text-gray-700 mb-1">Saída:</label>
+                                <input type="time" id="saida" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Intervalos -->
+                    <div class="mb-4">
+                        <h3 class="font-medium mb-2 text-gray-700">Intervalos</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="intervaloSaida" class="block text-sm font-medium text-gray-700 mb-1">Saída Intervalo:</label>
+                                <input type="time" id="intervaloSaida" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                            <div>
+                                <label for="intervaloRetorno" class="block text-sm font-medium text-gray-700 mb-1">Retorno Intervalo:</label>
+                                <input type="time" id="intervaloRetorno" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Entradas e Saídas Adicionais -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-medium text-gray-700">Entradas/Saídas Adicionais</h3>
+                            <button type="button" id="adicionarHorario" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                        <div id="horariosAdicionais" class="space-y-2">
+                            <!-- Horários adicionais serão inseridos aqui -->
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="observacoes" class="block text-sm font-medium text-gray-700 mb-1">Observações (opcional):</label>
+                        <textarea id="observacoes" class="w-full border border-gray-300 rounded-lg px-3 py-2" rows="2" placeholder="Anotações sobre o dia..."></textarea>
+                    </div>
+                    
+                    <div class="flex justify-between gap-4">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex-1">
+                            <i class="fas fa-save"></i> Salvar Registro
+                        </button>
+                        <button type="button" id="limparForm" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-times"></i> Limpar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Configurações de salário por hora/aula -->
+            <div class="bg-white rounded-lg shadow p-6 no-print">
+                <h2 class="text-xl font-bold mb-4">💰 Configurações de Salário</h2>
+                
+                <div class="mb-6">
+                    <label for="valorHoraAula" class="block text-sm font-medium text-gray-700 mb-1">Valor da Hora/Aula (R$):</label>
+                    <input type="number" id="valorHoraAula" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="50.00">
+                    <p class="text-xs text-gray-500 mt-1">Este valor será usado para calcular seu salário</p>
+                </div>
+
+                <div class="mb-4">
+                    <label for="valorHoraExtra" class="block text-sm font-medium text-gray-700 mb-1">Valor da Hora Extra (%):</label>
+                    <input type="number" id="valorHoraExtra" step="1" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="50">
+                    <p class="text-xs text-gray-500 mt-1">Percentual de acréscimo para horas extras</p>
+                </div>
+                
+                <div class="mb-4">
+                    <h3 class="font-medium mb-2">📊 Cálculo Automático</h3>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="flex justify-between mb-2">
+                            <span>Total de Horas:</span>
+                            <span id="infoTotalHoras">0h 0min</span>
+                        </div>
+                        <div class="flex justify-between mb-2">
+                            <span>Horas Extras:</span>
+                            <span id="infoHorasExtras">0h 0min</span>
+                        </div>
+                        <div class="flex justify-between mb-2">
+                            <span>Valor Hora/Aula:</span>
+                            <span id="infoValorHora">R$ 0,00</span>
+                        </div>
+                        <div class="flex justify-between font-bold border-t pt-2">
+                            <span>Salário Bruto:</span>
+                            <span id="infoSalarioBruto">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 class="font-medium mb-2">📉 Descontos Adicionais:</h3>
+                <div id="descontosContainer" class="mb-4">
+                    <!-- Descontos serão adicionados aqui -->
+                </div>
+                
+                <button id="adicionarDesconto" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg w-full mb-4">
+                    <i class="fas fa-plus"></i> Adicionar Desconto
+                </button>
+                
+                <button id="calcularSalario" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg w-full">
+                    <i class="fas fa-calculator"></i> Calcular Salário Completo
+                </button>
+            </div>
+
+            <!-- Resumo e gráficos -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">📈 Resumo do Mês</h2>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <p class="text-sm text-blue-700">Total de Horas</p>
+                        <p class="text-2xl font-bold text-blue-800" id="totalHoras">00:00</p>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <p class="text-sm text-green-700">Salário Líquido</p>
+                        <p class="text-2xl font-bold text-green-800" id="salarioLiquido">R$ 0,00</p>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="font-medium mb-2">Horas por Semana</h3>
+                    <canvas id="horasSemanaisChart" height="150"></canvas>
+                </div>
+                
+                <div class="no-print">
+                    <button id="imprimirRelatorio" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg w-full">
+                        <i class="fas fa-print"></i> Imprimir Relatório
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Comparativo Anual -->
+        <div class="bg-white rounded-lg shadow p-6 mt-8 no-print">
+            <h2 class="text-xl font-bold mb-4">📊 Comparativo Anual</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="font-medium mb-2">Horas Trabalhadas por Mês</h3>
+                    <canvas id="horasMensaisChart" height="250"></canvas>
+                </div>
+                <div>
+                    <h3 class="font-medium mb-2">Salário por Mês</h3>
+                    <canvas id="salarioMensalChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de registros -->
+        <div class="bg-white rounded-lg shadow p-6 mt-8">
+            <h2 class="text-xl font-bold mb-4">📋 Registros do Mês</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 px-4 py-2 text-left">Data</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Horários</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Total Diário</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Total Semanal</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Horas Extras</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Valor Diário</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Observações</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left no-print">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="registrosTbody">
+                        <!-- Registros serão preenchidos via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Relatório para impressão -->
+        <div id="relatorioImpressao" class="hidden print-only">
+            <h1 class="text-2xl font-bold mb-4">Relatório de Ponto</h1>
+            <p id="periodoRelatorio" class="mb-4"></p>
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-200">
+                        <th class="border border-gray-400 px-4 py-2 text-left">Data</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Horários</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Total Diário</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Horas Extras</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Valor Diário</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Total Semanal</th>
+                    </tr>
+                </thead>
+                <tbody id="relatorioTbody">
+                    <!-- Conteúdo será preenchido via JavaScript -->
+                </tbody>
+            </table>
+            <div class="mt-6">
+                <h2 class="text-xl font-bold mb-2">Resumo Financeiro</h2>
+                <p>Valor Hora/Aula: <span id="relatorioValorHora"></span></p>
+                <p>Total de Horas: <span id="relatorioTotalHoras"></span></p>
+                <p>Horas Extras: <span id="relatorioHorasExtras"></span></p>
+                <p>Salário Bruto: <span id="relatorioSalarioBruto"></span></p>
+                <p>Salário Líquido: <span id="relatorioSalarioLiquido"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-gray-600 text-sm mt-8 no-print">
+        <div class="container mx-auto px-4">
+            <p>⏰ <strong>Controle de Ponto Digital</strong> - Sistema gratuito desenvolvido para facilitar o controle de horas trabalhadas</p>
+            <p class="mt-2">📊 Todos os dados são armazenados na nuvem • 🔒 Seus dados são privados e seguros</p>
+            <p class="mt-2">💡 Dica: Faça login de qualquer dispositivo para acessar seus dados</p>
+        </div>
+    </footer>
+
+    <script>
+        // Configuração do Supabase
+        const SUPABASE_URL = 'https://seu-projeto.supabase.co';
+        const SUPABASE_ANON_KEY = 'sua-chave-anon-publica';
+        
+        // Inicializar Supabase
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Variáveis globais
+        let usuarioAtual = null;
+        let registros = {};
+        let mesAtual = new Date().getMonth();
+        let anoAtual = new Date().getFullYear();
+        let darkMode = false;
+        let configSalario = {
+            valorHoraAula: '50.00',
+            valorHoraExtra: '50',
+            descontos: []
+        };
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            verificarLogin();
+            configurarEventosLogin();
+            mostrarToast('Sistema carregado com sucesso!', 'success');
+        });
+
+        // Função para mostrar notificações toast
+        function mostrarToast(mensagem, tipo = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = mensagem;
+            toast.className = 'toast';
+            
+            if (tipo === 'error') {
+                toast.classList.add('error');
+            } else if (tipo === 'warning') {
+                toast.classList.add('warning');
+            }
+            
+            toast.classList.remove('hidden');
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        // Verificar se há usuário logado
+        async function verificarLogin() {
+            const usuarioLogado = localStorage.getItem('usuarioLogado');
+            if (usuarioLogado) {
+                usuarioAtual = usuarioLogado;
+                await carregarDadosUsuario();
+                mostrarApp();
+            } else {
+                mostrarLogin();
+            }
+        }
+
+        // Mostrar tela de login
+        function mostrarLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('appScreen').classList.add('hidden');
+        }
+
+        // Mostrar aplicativo após login
+        function mostrarApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('appScreen').classList.remove('hidden');
+            
+            // Atualizar interface com nome do usuário
+            document.getElementById('userWelcome').textContent = usuarioAtual;
+            
+            // Inicializar o sistema de ponto
+            inicializarAnos();
+            atualizarTabela();
+            atualizarResumo();
+            atualizarCalculoAutomatico();
+            atualizarDashboard();
+            configurarEventos();
+            atualizarGraficosAnuais();
+            
+            mostrarToast(`Bem-vindo de volta, ${usuarioAtual}!`, 'success');
+        }
+
+        // Configurar eventos de login/cadastro
+        function configurarEventosLogin() {
+            // Alternar entre login e cadastro
+            document.getElementById('showRegister').addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('registerForm').classList.remove('hidden');
+            });
+            
+            document.getElementById('showLogin').addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('registerForm').classList.add('hidden');
+                document.getElementById('loginForm').classList.remove('hidden');
+            });
+            
+            // Login
+            document.getElementById('loginBtn').addEventListener('click', async function() {
+                const username = document.getElementById('loginUsername').value.trim();
+                const password = document.getElementById('loginPassword').value;
+                
+                if (!username || !password) {
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                // Mostrar loading
+                document.getElementById('loginText').textContent = 'Entrando...';
+                document.getElementById('loginLoading').classList.remove('hidden');
+                
+                try {
+                    const { data, error } = await supabase
+                        .from('usuarios')
+                        .select('*')
+                        .eq('username', username)
+                        .eq('password', password)
+                        .single();
+                    
+                    if (error || !data) {
+                        mostrarToast('Usuário ou senha incorretos.', 'error');
+                    } else {
+                        usuarioAtual = username;
+                        localStorage.setItem('usuarioLogado', username);
+                        await carregarDadosUsuario();
+                        mostrarApp();
+                    }
+                } catch (error) {
+                    mostrarToast('Erro ao fazer login. Tente novamente.', 'error');
+                } finally {
+                    // Restaurar botão
+                    document.getElementById('loginText').textContent = 'Entrar';
+                    document.getElementById('loginLoading').classList.add('hidden');
+                }
+            });
+            
+            // Cadastro
+            document.getElementById('registerBtn').addEventListener('click', async function() {
+                const username = document.getElementById('registerUsername').value.trim();
+                const password = document.getElementById('registerPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                if (!username || !password || !confirmPassword) {
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                if (username.length < 3) {
+                    mostrarToast('O usuário deve ter pelo menos 3 caracteres.', 'error');
+                    return;
+                }
+                
+                if (password.length < 4) {
+                    mostrarToast('A senha deve ter pelo menos 4 caracteres.', 'error');
+                    return;
+                }
+                
+                if (password !== confirmPassword) {
+                    mostrarToast('As senhas não coincidem.', 'error');
+                    return;
+                }
+                
+                // Mostrar loading
+                document.getElementById('registerText').textContent = 'Cadastrando...';
+                document.getElementById('registerLoading').classList.remove('hidden');
+                
+                try {
+                    // Verificar se usuário já existe
+                    const { data: existingUser, error: checkError } = await supabase
+                        .from('usuarios')
+                        .select('username')
+                        .eq('username', username)
+                        .single();
+                    
+                    if (existingUser) {
+                        mostrarToast('Este usuário já existe. Escolha outro nome.', 'error');
+                        return;
+                    }
+                    
+                    // Criar novo usuário
+                    const { data, error } = await supabase
+                        .from('usuarios')
+                        .insert([
+                            { 
+                                username: username, 
+                                password: password,
+                                registros: {},
+                                configSalario: configSalario
+                            }
+                        ]);
+                    
+                    if (error) {
+                        mostrarToast('Erro ao criar usuário. Tente novamente.', 'error');
+                    } else {
+                        mostrarToast('Cadastro realizado com sucesso! Faça login.', 'success');
+                        document.getElementById('registerForm').classList.add('hidden');
+                        document.getElementById('loginForm').classList.remove('hidden');
+                        document.getElementById('registerUsername').value = '';
+                        document.getElementById('registerPassword').value = '';
+                        document.getElementById('confirmPassword').value = '';
+                    }
+                } catch (error) {
+                    mostrarToast('Erro ao criar usuário. Tente novamente.', 'error');
+                } finally {
+                    // Restaurar botão
+                    document.getElementById('registerText').textContent = 'Cadastrar';
+                    document.getElementById('registerLoading').classList.add('hidden');
+                }
+            });
+            
+            // Permitir login com Enter
+            document.getElementById('loginPassword').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('loginBtn').click();
+                }
+            });
+            
+            document.getElementById('confirmPassword').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    document.getElementById('registerBtn').click();
+                }
+            });
+        }
+
+        // Carregar dados do usuário
+        async function carregarDadosUsuario() {
+            try {
+                const { data, error } = await supabase
+                    .from('usuarios')
+                    .select('*')
+                    .eq('username', usuarioAtual)
+                    .single();
+                
+                if (data) {
+                    registros = data.registros || {};
+                    configSalario = data.configSalario || configSalario;
+                    
+                    // Atualizar configurações na interface
+                    document.getElementById('valorHoraAula').value = configSalario.valorHoraAula || '50.00';
+                    document.getElementById('valorHoraExtra').value = configSalario.valorHoraExtra || '50';
+                    
+                    // Atualizar descontos
+                    atualizarDescontosInterface();
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dados do usuário:', error);
+            }
+        }
+
+        // Salvar dados do usuário
+        async function salvarDadosUsuario() {
+            try {
+                const { data, error } = await supabase
+                    .from('usuarios')
+                    .update({
+                        registros: registros,
+                        configSalario: configSalario
+                    })
+                    .eq('username', usuarioAtual);
+                
+                if (error) {
+                    console.error('Erro ao salvar dados:', error);
+                    mostrarToast('Erro ao salvar dados.', 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao salvar dados:', error);
+                mostrarToast('Erro ao salvar dados.', 'error');
+            }
+        }
+
+        // Configurar eventos do sistema
+        function configurarEventos() {
+            // Tema escuro
+            document.getElementById('darkModeToggle').addEventListener('click', function() {
+                darkMode = !darkMode;
+                document.body.classList.toggle('dark-mode', darkMode);
+                this.innerHTML = darkMode ? '<i class="fas fa-sun"></i> Modo Claro' : '<i class="fas fa-moon"></i> Modo Escuro';
+            });
+            
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                localStorage.removeItem('usuarioLogado');
+                usuarioAtual = null;
+                registros = {};
+                mostrarLogin();
+                mostrarToast('Logout realizado com sucesso!', 'success');
+            });
+            
+            // Abas de mês
+            document.querySelectorAll('.month-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    mesAtual = parseInt(this.getAttribute('data-month'));
+                    atualizarTabela();
+                    atualizarResumo();
+                    atualizarDashboard();
+                    atualizarGraficosAnuais();
+                    
+                    // Atualizar aba ativa
+                    document.querySelectorAll('.month-tab').forEach(t => t.classList.remove('tab-active'));
+                    this.classList.add('tab-active');
+                });
+            });
+            
+            // Ano selecionado
+            document.getElementById('yearSelect').addEventListener('change', function() {
+                anoAtual = parseInt(this.value);
+                atualizarTabela();
+                atualizarResumo();
+                atualizarDashboard();
+                atualizarGraficosAnuais();
+            });
+            
+            // Formulário de ponto
+            document.getElementById('pontoForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                salvarRegistro();
+            });
+            
+            // Limpar formulário
+            document.getElementById('limparForm').addEventListener('click', function() {
+                document.getElementById('pontoForm').reset();
+                document.getElementById('horariosAdicionais').innerHTML = '';
+            });
+            
+            // Adicionar horário adicional
+            document.getElementById('adicionarHorario').addEventListener('click', function() {
+                adicionarHorarioAdicional();
+            });
+            
+            // Calcular salário
+            document.getElementById('calcularSalario').addEventListener('click', function() {
+                calcularSalarioCompleto();
+            });
+            
+            // Adicionar desconto
+            document.getElementById('adicionarDesconto').addEventListener('click', function() {
+                adicionarDesconto();
+            });
+            
+            // Exportar dados
+            document.getElementById('exportBtn').addEventListener('click', function() {
+                exportarDados();
+            });
+            
+            // Imprimir relatório
+            document.getElementById('imprimirRelatorio').addEventListener('click', function() {
+                imprimirRelatorio();
+            });
+            
+            // Configurações de salário
+            document.getElementById('valorHoraAula').addEventListener('change', function() {
+                configSalario.valorHoraAula = this.value;
+                salvarDadosUsuario();
+                atualizarCalculoAutomatico();
+                atualizarResumo();
+                atualizarDashboard();
+            });
+            
+            document.getElementById('valorHoraExtra').addEventListener('change', function() {
+                configSalario.valorHoraExtra = this.value;
+                salvarDadosUsuario();
+                atualizarCalculoAutomatico();
+                atualizarResumo();
+                atualizarDashboard();
+            });
+            
+            // Definir aba do mês atual como ativa
+            document.querySelector(`.month-tab[data-month="${mesAtual}"]`).classList.add('tab-active');
+        }
+
+        // Resto das funções permanecem as mesmas (inicializarAnos, atualizarTabela, etc.)
+        // ... (mantenha todas as outras funções do código original)
+
+        // IMPORTANTE: Substitua todas as chamadas para salvarDados() por salvarDadosUsuario()
+        // e todas as referências a localStorage por chamadas ao Supabase
+
+    </script>
+</body>
+</html>
