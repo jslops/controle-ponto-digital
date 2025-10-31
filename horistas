@@ -1,0 +1,2052 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Ponto Digital - Sistema Gratuito</title>
+    <meta name="description" content="Sistema gratuito de controle de ponto eletrônico. Registre suas horas trabalhadas, calcule salários e gere relatórios.">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="keywords" content="ponto eletrônico, controle de horas, calcular salário, registro de ponto">
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="Controle de Ponto Digital">
+    <meta property="og:description" content="Sistema gratuito para controle de ponto eletrônico">
+    <meta property="og:type" content="website">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>">
+    
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .tab-active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .exceeded {
+            background-color: #fee2e2;
+        }
+        .print-only {
+            display: none;
+        }
+        .dashboard-card {
+            transition: all 0.3s ease;
+        }
+        .dashboard-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        .time-entry {
+            transition: all 0.3s ease;
+        }
+        .time-entry:hover {
+            background-color: #f8fafc;
+        }
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            .print-only {
+                display: block;
+            }
+            body {
+                font-size: 12px;
+            }
+            .container {
+                max-width: 100% !important;
+            }
+        }
+        .dark-mode {
+            background-color: #1f2937;
+            color: #f9fafb;
+        }
+        .dark-mode .bg-white {
+            background-color: #374151;
+        }
+        .dark-mode .bg-gray-100 {
+            background-color: #4b5563;
+        }
+        .dark-mode .border-gray-300 {
+            border-color: #6b7280;
+        }
+        .dark-mode input, .dark-mode select {
+            background-color: #4b5563;
+            color: #f9fafb;
+            border-color: #6b7280;
+        }
+        .login-container {
+            max-width: 400px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .hidden {
+            display: none;
+        }
+        .admin-panel {
+            background-color: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Melhorias para mobile */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            .grid-cols-1, .grid-cols-2, .grid-cols-3, .grid-cols-4 {
+                grid-template-columns: 1fr !important;
+            }
+            .flex-wrap {
+                flex-direction: column;
+            }
+            .month-tab {
+                margin-bottom: 5px;
+                text-align: center;
+                padding: 10px 5px;
+            }
+            .header-buttons {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .header-buttons button {
+                width: 100%;
+            }
+        }
+        
+        /* Loading animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            background: #10b981;
+            color: white;
+            border-radius: 5px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        .toast.show {
+            transform: translateX(0);
+        }
+        .toast.error {
+            background: #ef4444;
+        }
+        .toast.warning {
+            background: #f59e0b;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- Tela de Login -->
+    <div id="loginScreen" class="login-container bg-white">
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold text-blue-600">⏰ Controle de Ponto</h1>
+            <p class="text-gray-600 mt-2">Sistema gratuito de ponto eletrônico</p>
+        </div>
+        
+        <div id="loginForm">
+            <h2 class="text-xl font-bold mb-4 text-center">Login</h2>
+            <div class="mb-4">
+                <label for="loginUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
+                <input type="text" id="loginUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+            </div>
+            <div class="mb-4">
+                <label for="loginPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha:</label>
+                <input type="password" id="loginPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+            </div>
+            <div class="mb-4">
+                <button id="loginBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                    <span id="loginText">Entrar</span>
+                    <div id="loginLoading" class="loading hidden ml-2"></div>
+                </button>
+            </div>
+            <p class="text-center text-sm">
+                Não tem uma conta? 
+                <a href="#" id="showRegister" class="text-blue-500 hover:text-blue-700 font-medium">Cadastre-se</a>
+            </p>
+        </div>
+        
+        <div id="registerForm" class="hidden">
+            <h2 class="text-xl font-bold mb-4 text-center">Cadastro</h2>
+            <div class="mb-4">
+                <label for="registerUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
+                <input type="text" id="registerUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" required minlength="3">
+                <p class="text-xs text-gray-500 mt-1">Mínimo 3 caracteres</p>
+            </div>
+            <div class="mb-4">
+                <label for="registerPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha:</label>
+                <input type="password" id="registerPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required minlength="4">
+                <p class="text-xs text-gray-500 mt-1">Mínimo 4 caracteres</p>
+            </div>
+            <div class="mb-4">
+                <label for="confirmPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha:</label>
+                <input type="password" id="confirmPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+            </div>
+            <div class="mb-4">
+                <button id="registerBtn" class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                    <span id="registerText">Cadastrar</span>
+                    <div id="registerLoading" class="loading hidden ml-2"></div>
+                </button>
+            </div>
+            <p class="text-center text-sm">
+                Já tem uma conta? 
+                <a href="#" id="showLogin" class="text-blue-500 hover:text-blue-700 font-medium">Faça login</a>
+            </p>
+        </div>
+
+        <!-- Informações do sistema -->
+        <div class="mt-8 p-4 bg-blue-50 rounded-lg">
+            <h3 class="font-bold text-blue-800 mb-2">💡 Como usar:</h3>
+            <ul class="text-sm text-blue-700 space-y-1">
+                <li>• Cadastre-se e faça login</li>
+                <li>• Registre seus horários de trabalho</li>
+                <li>• Configure o valor da sua hora/aula</li>
+                <li>• Acompanhe relatórios e cálculos automáticos</li>
+                <li>• Todos os dados ficam salvos no seu navegador</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Painel Administrativo -->
+    <div id="adminScreen" class="container mx-auto px-4 py-8 hidden">
+        <header class="mb-8">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">⚙️ Painel Administrativo</h1>
+                    <p class="text-gray-600 mt-2">Gerenciamento de usuários do sistema</p>
+                </div>
+                <button id="adminLogoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg">
+                    <i class="fas fa-sign-out-alt"></i> Sair
+                </button>
+            </div>
+        </header>
+
+        <div class="admin-panel">
+            <h2 class="text-xl font-bold mb-4">👥 Gerenciar Usuários</h2>
+            
+            <div class="mb-6">
+                <h3 class="font-medium mb-2">🔐 Alterar Senha do Admin</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label for="currentPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha Atual:</label>
+                        <input type="password" id="currentPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label for="newPassword" class="block text-sm font-medium text-gray-700 mb-1">Nova Senha:</label>
+                        <input type="password" id="newPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" minlength="4">
+                    </div>
+                    <div>
+                        <label for="confirmNewPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Nova Senha:</label>
+                        <input type="password" id="confirmNewPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                </div>
+                <button id="changeAdminPassword" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg">
+                    Alterar Senha
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <h3 class="font-medium mb-2">📋 Lista de Usuários</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100">
+                                <th class="border border-gray-300 px-4 py-2 text-left">Usuário</th>
+                                <th class="border border-gray-300 px-4 py-2 text-left">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersList">
+                            <!-- Lista de usuários será preenchida via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div>
+                <h3 class="font-medium mb-2">➕ Criar Novo Usuário</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label for="newUsername" class="block text-sm font-medium text-gray-700 mb-1">Usuário:</label>
+                        <input type="text" id="newUsername" class="w-full border border-gray-300 rounded-lg px-3 py-2" minlength="3">
+                    </div>
+                    <div>
+                        <label for="newUserPassword" class="block text-sm font-medium text-gray-700 mb-1">Senha:</label>
+                        <input type="password" id="newUserPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2" minlength="4">
+                    </div>
+                    <div>
+                        <label for="confirmNewUserPassword" class="block text-sm font-medium text-gray-700 mb-1">Confirmar Senha:</label>
+                        <input type="password" id="confirmNewUserPassword" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                </div>
+                <button id="createUserBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg">
+                    Criar Usuário
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sistema de Controle de Ponto (após login) -->
+    <div id="appScreen" class="container mx-auto px-4 py-8 hidden">
+        <!-- Cabeçalho -->
+        <header class="mb-8">
+            <div class="flex justify-between items-center flex-wrap gap-4">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-800">⏰ Controle de Ponto Digital</h1>
+                    <p class="text-gray-600 mt-2">Bem-vindo, <span id="userWelcome" class="font-semibold"></span>!</p>
+                </div>
+                <div class="flex space-x-4 header-buttons">
+                    <button id="darkModeToggle" class="bg-gray-200 hover:bg-gray-300 px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-moon"></i> Modo Escuro
+                    </button>
+                    <button id="exportBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-download"></i> Exportar
+                    </button>
+                    <button id="importBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-upload"></i> Importar
+                    </button>
+                    <input type="file" id="importFile" class="hidden" accept=".json">
+                    <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg no-print">
+                        <i class="fas fa-sign-out-alt"></i> Sair
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Dashboard Resumo -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 no-print">
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-blue-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-clock text-blue-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Horas Este Mês</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardHorasMes">00:00</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-green-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-money-bill-wave text-green-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Salário Este Mês</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardSalarioMes">R$ 0,00</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-purple-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-chart-line text-purple-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Média Horas/Semana</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardMediaSemanal">00:00</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dashboard-card bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="bg-orange-100 p-3 rounded-lg mr-4">
+                        <i class="fas fa-bolt text-orange-600 text-xl"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Horas Extras</p>
+                        <p class="text-2xl font-bold text-gray-800" id="dashboardHorasExtras">00:00</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Abas dos meses -->
+        <div class="mb-6 no-print">
+            <div class="flex flex-wrap gap-2">
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="0">Jan</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="1">Fev</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="2">Mar</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="3">Abr</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="4">Mai</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="5">Jun</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="6">Jul</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="7">Ago</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="8">Set</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="9">Out</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="10">Nov</button>
+                <button class="month-tab px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-100" data-month="11">Dez</button>
+            </div>
+        </div>
+
+        <!-- Ano selecionado -->
+        <div class="mb-6 no-print">
+            <label for="yearSelect" class="block text-sm font-medium text-gray-700 mb-1">Ano:</label>
+            <select id="yearSelect" class="border border-gray-300 rounded-lg px-4 py-2 w-32">
+                <!-- Opções de ano serão preenchidas via JavaScript -->
+            </select>
+        </div>
+
+        <!-- Conteúdo principal -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Formulário de registro -->
+            <div class="bg-white rounded-lg shadow p-6 no-print">
+                <h2 class="text-xl font-bold mb-4">📝 Registrar Ponto</h2>
+                <form id="pontoForm">
+                    <div class="mb-4">
+                        <label for="data" class="block text-sm font-medium text-gray-700 mb-1">Data:</label>
+                        <input type="date" id="data" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                    </div>
+                    
+                    <!-- Entradas e Saídas Principais -->
+                    <div class="mb-4">
+                        <h3 class="font-medium mb-2 text-gray-700">Período Principal</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="entrada" class="block text-sm font-medium text-gray-700 mb-1">Entrada:</label>
+                                <input type="time" id="entrada" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                            </div>
+                            <div>
+                                <label for="saida" class="block text-sm font-medium text-gray-700 mb-1">Saída:</label>
+                                <input type="time" id="saida" class="w-full border border-gray-300 rounded-lg px-3 py-2" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Intervalos -->
+                    <div class="mb-4">
+                        <h3 class="font-medium mb-2 text-gray-700">Intervalos</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="intervaloSaida" class="block text-sm font-medium text-gray-700 mb-1">Saída Intervalo:</label>
+                                <input type="time" id="intervaloSaida" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                            <div>
+                                <label for="intervaloRetorno" class="block text-sm font-medium text-gray-700 mb-1">Retorno Intervalo:</label>
+                                <input type="time" id="intervaloRetorno" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Entradas e Saídas Adicionais -->
+                    <div class="mb-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 class="font-medium text-gray-700">Entradas/Saídas Adicionais</h3>
+                            <button type="button" id="adicionarHorario" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm">
+                                <i class="fas fa-plus"></i> Adicionar
+                            </button>
+                        </div>
+                        <div id="horariosAdicionais" class="space-y-2">
+                            <!-- Horários adicionais serão inseridos aqui -->
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="observacoes" class="block text-sm font-medium text-gray-700 mb-1">Observações (opcional):</label>
+                        <textarea id="observacoes" class="w-full border border-gray-300 rounded-lg px-3 py-2" rows="2" placeholder="Anotações sobre o dia..."></textarea>
+                    </div>
+                    
+                    <div class="flex justify-between gap-4">
+                        <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex-1">
+                            <i class="fas fa-save"></i> Salvar Registro
+                        </button>
+                        <button type="button" id="limparForm" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-times"></i> Limpar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Configurações de salário por hora/aula -->
+            <div class="bg-white rounded-lg shadow p-6 no-print">
+                <h2 class="text-xl font-bold mb-4">💰 Configurações de Salário</h2>
+                
+                <div class="mb-6">
+                    <label for="valorHoraAula" class="block text-sm font-medium text-gray-700 mb-1">Valor da Hora/Aula (R$):</label>
+                    <input type="number" id="valorHoraAula" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="50.00">
+                    <p class="text-xs text-gray-500 mt-1">Este valor será usado para calcular seu salário</p>
+                </div>
+
+                <div class="mb-4">
+                    <label for="valorHoraExtra" class="block text-sm font-medium text-gray-700 mb-1">Valor da Hora Extra (%):</label>
+                    <input type="number" id="valorHoraExtra" step="1" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2" value="50">
+                    <p class="text-xs text-gray-500 mt-1">Percentual de acréscimo para horas extras</p>
+                </div>
+                
+                <div class="mb-4">
+                    <h3 class="font-medium mb-2">📊 Cálculo Automático</h3>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="flex justify-between mb-2">
+                            <span>Total de Horas:</span>
+                            <span id="infoTotalHoras">0h 0min</span>
+                        </div>
+                        <div class="flex justify-between mb-2">
+                            <span>Horas Extras:</span>
+                            <span id="infoHorasExtras">0h 0min</span>
+                        </div>
+                        <div class="flex justify-between mb-2">
+                            <span>Valor Hora/Aula:</span>
+                            <span id="infoValorHora">R$ 0,00</span>
+                        </div>
+                        <div class="flex justify-between font-bold border-t pt-2">
+                            <span>Salário Bruto:</span>
+                            <span id="infoSalarioBruto">R$ 0,00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <h3 class="font-medium mb-2">📉 Descontos Adicionais:</h3>
+                <div id="descontosContainer" class="mb-4">
+                    <!-- Descontos serão adicionados aqui -->
+                </div>
+                
+                <button id="adicionarDesconto" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg w-full mb-4">
+                    <i class="fas fa-plus"></i> Adicionar Desconto
+                </button>
+                
+                <button id="calcularSalario" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg w-full">
+                    <i class="fas fa-calculator"></i> Calcular Salário Completo
+                </button>
+            </div>
+
+            <!-- Resumo e gráficos -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-xl font-bold mb-4">📈 Resumo do Mês</h2>
+                
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <div class="bg-blue-50 rounded-lg p-4">
+                        <p class="text-sm text-blue-700">Total de Horas</p>
+                        <p class="text-2xl font-bold text-blue-800" id="totalHoras">00:00</p>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-4">
+                        <p class="text-sm text-green-700">Salário Líquido</p>
+                        <p class="text-2xl font-bold text-green-800" id="salarioLiquido">R$ 0,00</p>
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <h3 class="font-medium mb-2">Horas por Semana</h3>
+                    <canvas id="horasSemanaisChart" height="150"></canvas>
+                </div>
+                
+                <div class="no-print">
+                    <button id="imprimirRelatorio" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg w-full">
+                        <i class="fas fa-print"></i> Imprimir Relatório
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráfico Comparativo Anual -->
+        <div class="bg-white rounded-lg shadow p-6 mt-8 no-print">
+            <h2 class="text-xl font-bold mb-4">📊 Comparativo Anual</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="font-medium mb-2">Horas Trabalhadas por Mês</h3>
+                    <canvas id="horasMensaisChart" height="250"></canvas>
+                </div>
+                <div>
+                    <h3 class="font-medium mb-2">Salário por Mês</h3>
+                    <canvas id="salarioMensalChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela de registros -->
+        <div class="bg-white rounded-lg shadow p-6 mt-8">
+            <h2 class="text-xl font-bold mb-4">📋 Registros do Mês</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100">
+                            <th class="border border-gray-300 px-4 py-2 text-left">Data</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Horários</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Total Diário</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Total Semanal</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Horas Extras</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Valor Diário</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left">Observações</th>
+                            <th class="border border-gray-300 px-4 py-2 text-left no-print">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="registrosTbody">
+                        <!-- Registros serão preenchidos via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Relatório para impressão -->
+        <div id="relatorioImpressao" class="hidden print-only">
+            <h1 class="text-2xl font-bold mb-4">Relatório de Ponto</h1>
+            <p id="periodoRelatorio" class="mb-4"></p>
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr class="bg-gray-200">
+                        <th class="border border-gray-400 px-4 py-2 text-left">Data</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Horários</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Total Diário</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Horas Extras</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Valor Diário</th>
+                        <th class="border border-gray-400 px-4 py-2 text-left">Total Semanal</th>
+                    </tr>
+                </thead>
+                <tbody id="relatorioTbody">
+                    <!-- Conteúdo será preenchido via JavaScript -->
+                </tbody>
+            </table>
+            <div class="mt-6">
+                <h2 class="text-xl font-bold mb-2">Resumo Financeiro</h2>
+                <p>Valor Hora/Aula: <span id="relatorioValorHora"></span></p>
+                <p>Total de Horas: <span id="relatorioTotalHoras"></span></p>
+                <p>Horas Extras: <span id="relatorioHorasExtras"></span></p>
+                <p>Salário Bruto: <span id="relatorioSalarioBruto"></span></p>
+                <p>Salário Líquido: <span id="relatorioSalarioLiquido"></span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-gray-600 text-sm mt-8 no-print">
+        <div class="container mx-auto px-4">
+            <p>⏰ <strong>Controle de Ponto Digital</strong> - Sistema gratuito desenvolvido para facilitar o controle de horas trabalhadas</p>
+            <p class="mt-2">📊 Todos os dados são armazenados localmente no seu navegador • 🔒 Seus dados são privados e seguros</p>
+            <p class="mt-2">💡 Dica: Exporte seus dados regularmente para backup</p>
+        </div>
+    </footer>
+
+    <script>
+        // Variáveis globais
+        let usuarios = {};
+        let usuarioAtual = null;
+        let registros = {};
+        let mesAtual = new Date().getMonth();
+        let anoAtual = new Date().getFullYear();
+        let darkMode = false;
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            carregarUsuarios();
+            verificarLogin();
+            configurarEventosLogin();
+            mostrarToast('Sistema carregado com sucesso!', 'success');
+        });
+
+        // Função para mostrar notificações toast
+        function mostrarToast(mensagem, tipo = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = mensagem;
+            toast.className = 'toast';
+            
+            if (tipo === 'error') {
+                toast.classList.add('error');
+            } else if (tipo === 'warning') {
+                toast.classList.add('warning');
+            }
+            
+            toast.classList.remove('hidden');
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        // Carregar usuários do localStorage
+        function carregarUsuarios() {
+            const usuariosSalvos = localStorage.getItem('usuariosPonto');
+            if (usuariosSalvos) {
+                usuarios = JSON.parse(usuariosSalvos);
+            } else {
+                // Criar usuário admin padrão se não existir
+                usuarios = {
+                    'admin': {
+                        senha: 'admin123',
+                        isAdmin: true,
+                        registros: {},
+                        configSalario: {
+                            valorHoraAula: '50.00',
+                            valorHoraExtra: '50',
+                            descontos: []
+                        }
+                    }
+                };
+                localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+            }
+        }
+
+        // Verificar se há usuário logado
+        function verificarLogin() {
+            const usuarioLogado = localStorage.getItem('usuarioLogado');
+            if (usuarioLogado) {
+                usuarioAtual = usuarioLogado;
+                if (usuarioAtual === 'admin' && usuarios[usuarioAtual]?.isAdmin) {
+                    mostrarAdmin();
+                } else {
+                    mostrarApp();
+                }
+            } else {
+                mostrarLogin();
+            }
+        }
+
+        // Mostrar tela de login
+        function mostrarLogin() {
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('adminScreen').classList.add('hidden');
+            document.getElementById('appScreen').classList.add('hidden');
+        }
+
+        // Mostrar aplicativo após login
+        function mostrarApp() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('adminScreen').classList.add('hidden');
+            document.getElementById('appScreen').classList.remove('hidden');
+            
+            // Atualizar interface com nome do usuário
+            document.getElementById('userWelcome').textContent = usuarioAtual;
+            
+            // Inicializar o sistema de ponto
+            inicializarAnos();
+            carregarDadosUsuario();
+            atualizarTabela();
+            atualizarResumo();
+            configurarEventos();
+            atualizarCalculoAutomatico();
+            atualizarDashboard();
+            atualizarGraficosAnuais();
+            
+            mostrarToast(`Bem-vindo de volta, ${usuarioAtual}!`, 'success');
+        }
+
+        // Mostrar painel administrativo
+        function mostrarAdmin() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('appScreen').classList.add('hidden');
+            document.getElementById('adminScreen').classList.remove('hidden');
+            
+            // Carregar lista de usuários
+            carregarListaUsuarios();
+            
+            mostrarToast('Painel administrativo carregado', 'success');
+        }
+
+        // Configurar eventos de login/cadastro
+        function configurarEventosLogin() {
+            // Alternar entre login e cadastro
+            document.getElementById('showRegister').addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('registerForm').classList.remove('hidden');
+            });
+            
+            document.getElementById('showLogin').addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('registerForm').classList.add('hidden');
+                document.getElementById('loginForm').classList.remove('hidden');
+            });
+            
+            // Login
+            document.getElementById('loginBtn').addEventListener('click', function() {
+                const username = document.getElementById('loginUsername').value.trim();
+                const password = document.getElementById('loginPassword').value;
+                
+                if (!username || !password) {
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                // Mostrar loading
+                document.getElementById('loginText').textContent = 'Entrando...';
+                document.getElementById('loginLoading').classList.remove('hidden');
+                
+                setTimeout(() => {
+                    if (usuarios[username] && usuarios[username].senha === password) {
+                        usuarioAtual = username;
+                        localStorage.setItem('usuarioLogado', username);
+                        
+                        if (username === 'admin' && usuarios[username].isAdmin) {
+                            mostrarAdmin();
+                        } else {
+                            mostrarApp();
+                        }
+                    } else {
+                        mostrarToast('Usuário ou senha incorretos.', 'error');
+                    }
+                    
+                    // Restaurar botão
+                    document.getElementById('loginText').textContent = 'Entrar';
+                    document.getElementById('loginLoading').classList.add('hidden');
+                }, 1000);
+            });
+            
+            // Cadastro
+            document.getElementById('registerBtn').addEventListener('click', function() {
+                const username = document.getElementById('registerUsername').value.trim();
+                const password = document.getElementById('registerPassword').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                if (!username || !password || !confirmPassword) {
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                if (!validarUsuario(username, password)) {
+                    return;
+                }
+                
+                if (password !== confirmPassword) {
+                    mostrarToast('As senhas não coincidem.', 'error');
+                    return;
+                }
+                
+                if (usuarios[username]) {
+                    mostrarToast('Este nome de usuário já está em uso.', 'error');
+                    return;
+                }
+                
+                // Mostrar loading
+                document.getElementById('registerText').textContent = 'Cadastrando...';
+                document.getElementById('registerLoading').classList.remove('hidden');
+                
+                setTimeout(() => {
+                    // Criar novo usuário
+                    usuarios[username] = {
+                        senha: password,
+                        isAdmin: false,
+                        registros: {},
+                        configSalario: {
+                            valorHoraAula: '50.00',
+                            valorHoraExtra: '50',
+                            descontos: []
+                        }
+                    };
+                    
+                    localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+                    
+                    mostrarToast('Usuário cadastrado com sucesso! Faça login para continuar.', 'success');
+                    document.getElementById('registerForm').classList.add('hidden');
+                    document.getElementById('loginForm').classList.remove('hidden');
+                    
+                    // Limpar formulário
+                    document.getElementById('registerUsername').value = '';
+                    document.getElementById('registerPassword').value = '';
+                    document.getElementById('confirmPassword').value = '';
+                    
+                    // Restaurar botão
+                    document.getElementById('registerText').textContent = 'Cadastrar';
+                    document.getElementById('registerLoading').classList.add('hidden');
+                }, 1000);
+            });
+            
+            // Logout
+            document.getElementById('logoutBtn').addEventListener('click', function() {
+                usuarioAtual = null;
+                localStorage.removeItem('usuarioLogado');
+                mostrarLogin();
+                mostrarToast('Logout realizado com sucesso', 'success');
+            });
+            
+            // Logout do admin
+            document.getElementById('adminLogoutBtn').addEventListener('click', function() {
+                usuarioAtual = null;
+                localStorage.removeItem('usuarioLogado');
+                mostrarLogin();
+                mostrarToast('Logout realizado com sucesso', 'success');
+            });
+        }
+
+        // Validar usuário e senha
+        function validarUsuario(username, password) {
+            if (username.length < 3) {
+                mostrarToast('Usuário deve ter pelo menos 3 caracteres', 'error');
+                return false;
+            }
+            if (password.length < 4) {
+                mostrarToast('Senha deve ter pelo menos 4 caracteres', 'error');
+                return false;
+            }
+            if (username.toLowerCase() === 'admin' || username.toLowerCase() === 'administrador') {
+                mostrarToast('Este nome de usuário não é permitido', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        // Carregar lista de usuários no painel administrativo
+        function carregarListaUsuarios() {
+            const usersList = document.getElementById('usersList');
+            usersList.innerHTML = '';
+            
+            Object.keys(usuarios).forEach(username => {
+                if (username === 'admin') return; // Não mostrar o admin na lista
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="border border-gray-300 px-4 py-2">${username}</td>
+                    <td class="border border-gray-300 px-4 py-2">
+                        <button class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded excluir-usuario" data-username="${username}">
+                            <i class="fas fa-trash"></i> Excluir
+                        </button>
+                    </td>
+                `;
+                usersList.appendChild(tr);
+            });
+            
+            // Adicionar eventos aos botões de excluir
+            document.querySelectorAll('.excluir-usuario').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const username = this.getAttribute('data-username');
+                    if (confirm(`Tem certeza que deseja excluir o usuário ${username}? Todos os dados serão perdidos.`)) {
+                        delete usuarios[username];
+                        localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+                        carregarListaUsuarios();
+                        mostrarToast('Usuário excluído com sucesso!', 'success');
+                    }
+                });
+            });
+            
+            // Criar usuário
+            document.getElementById('createUserBtn').addEventListener('click', function() {
+                const username = document.getElementById('newUsername').value.trim();
+                const password = document.getElementById('newUserPassword').value;
+                const confirmPassword = document.getElementById('confirmNewUserPassword').value;
+                
+                if (!username || !password || !confirmPassword) {
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                if (!validarUsuario(username, password)) {
+                    return;
+                }
+                
+                if (password !== confirmPassword) {
+                    mostrarToast('As senhas não coincidem.', 'error');
+                    return;
+                }
+                
+                if (usuarios[username]) {
+                    mostrarToast('Este nome de usuário já está em uso.', 'error');
+                    return;
+                }
+                
+                // Criar novo usuário
+                usuarios[username] = {
+                    senha: password,
+                    isAdmin: false,
+                    registros: {},
+                    configSalario: {
+                        valorHoraAula: '50.00',
+                        valorHoraExtra: '50',
+                        descontos: []
+                    }
+                };
+                
+                localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+                
+                mostrarToast('Usuário criado com sucesso!', 'success');
+                carregarListaUsuarios();
+                
+                // Limpar formulário
+                document.getElementById('newUsername').value = '';
+                document.getElementById('newUserPassword').value = '';
+                document.getElementById('confirmNewUserPassword').value = '';
+            });
+            
+            // Alterar senha do admin
+            document.getElementById('changeAdminPassword').addEventListener('click', function() {
+                const currentPassword = document.getElementById('currentPassword').value;
+                const newPassword = document.getElementById('newPassword').value;
+                const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+                
+                if (!currentPassword || !newPassword || !confirmNewPassword) {
+                    mostrarToast('Por favor, preencha todos os campos.', 'error');
+                    return;
+                }
+                
+                if (currentPassword !== usuarios.admin.senha) {
+                    mostrarToast('Senha atual incorreta.', 'error');
+                    return;
+                }
+                
+                if (newPassword.length < 4) {
+                    mostrarToast('A nova senha deve ter pelo menos 4 caracteres.', 'error');
+                    return;
+                }
+                
+                if (newPassword !== confirmNewPassword) {
+                    mostrarToast('As novas senhas não coincidem.', 'error');
+                    return;
+                }
+                
+                usuarios.admin.senha = newPassword;
+                localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+                
+                mostrarToast('Senha alterada com sucesso!', 'success');
+                
+                // Limpar formulário
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmNewPassword').value = '';
+            });
+        }
+
+        // [As demais funções permanecem as mesmas do código anterior...]
+        // Carregar dados do usuário atual, salvar dados, inicializar anos, configurar eventos, etc.
+        // ... [todo o restante do código JavaScript permanece igual] ...
+
+        // Carregar dados do usuário atual
+        function carregarDadosUsuario() {
+            if (!usuarioAtual || !usuarios[usuarioAtual]) return;
+            
+            registros = usuarios[usuarioAtual].registros || {};
+            
+            // Carregar configurações de salário
+            const configSalario = usuarios[usuarioAtual].configSalario;
+            if (configSalario) {
+                document.getElementById('valorHoraAula').value = configSalario.valorHoraAula || '50.00';
+                document.getElementById('valorHoraExtra').value = configSalario.valorHoraExtra || '50';
+                
+                // Carregar descontos
+                const descontosContainer = document.getElementById('descontosContainer');
+                descontosContainer.innerHTML = '';
+                
+                if (configSalario.descontos && configSalario.descontos.length > 0) {
+                    configSalario.descontos.forEach(desconto => {
+                        adicionarCampoDesconto(desconto.descricao, desconto.valor);
+                    });
+                }
+            }
+            
+            // Ativar aba do mês atual
+            const tabAtual = document.querySelector(`.month-tab[data-month="${mesAtual}"]`);
+            if (tabAtual) {
+                document.querySelectorAll('.month-tab').forEach(t => t.classList.remove('tab-active'));
+                tabAtual.classList.add('tab-active');
+            }
+            
+            // Definir data atual no formulário
+            const hoje = new Date();
+            const dataFormatada = hoje.toLocaleDateString('en-CA');
+            document.getElementById('data').value = dataFormatada;
+        }
+
+        // Salvar dados do usuário atual
+        function salvarDadosUsuario() {
+            if (!usuarioAtual || !usuarios[usuarioAtual]) return;
+            
+            usuarios[usuarioAtual].registros = registros;
+            
+            // Salvar configurações de salário
+            const valorHoraAula = document.getElementById('valorHoraAula').value;
+            const valorHoraExtra = document.getElementById('valorHoraExtra').value;
+            const descontos = [];
+            
+            document.querySelectorAll('.desconto-item').forEach(item => {
+                const descricao = item.querySelector('.desconto-descricao').value;
+                const valor = parseFloat(item.querySelector('.desconto-valor').value) || 0;
+                
+                if (descricao) {
+                    descontos.push({ descricao, valor });
+                }
+            });
+            
+            usuarios[usuarioAtual].configSalario = {
+                valorHoraAula,
+                valorHoraExtra,
+                descontos
+            };
+            
+            localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+            
+            // Fazer backup automático
+            fazerBackupAutomatico();
+        }
+
+        // Backup automático
+        function fazerBackupAutomatico() {
+            const hoje = new Date().toISOString().split('T')[0];
+            const backupKey = `backup_${usuarioAtual}_${hoje}`;
+            
+            if (!localStorage.getItem(backupKey)) {
+                const dadosUsuario = JSON.stringify(usuarios[usuarioAtual]);
+                localStorage.setItem(backupKey, dadosUsuario);
+            }
+        }
+
+        // Inicializar seletor de anos
+        function inicializarAnos() {
+            const yearSelect = document.getElementById('yearSelect');
+            yearSelect.innerHTML = '';
+            const currentYear = new Date().getFullYear();
+            
+            for (let i = currentYear - 5; i <= currentYear + 5; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = i;
+                if (i === currentYear) option.selected = true;
+                yearSelect.appendChild(option);
+            }
+        }
+
+        // Configurar eventos
+        function configurarEventos() {
+            // Abas dos meses
+            document.querySelectorAll('.month-tab').forEach(tab => {
+                tab.addEventListener('click', function() {
+                    document.querySelectorAll('.month-tab').forEach(t => t.classList.remove('tab-active'));
+                    this.classList.add('tab-active');
+                    mesAtual = parseInt(this.getAttribute('data-month'));
+                    atualizarTabela();
+                    atualizarResumo();
+                    atualizarCalculoAutomatico();
+                    atualizarDashboard();
+                });
+            });
+            
+            // Seletor de ano
+            document.getElementById('yearSelect').addEventListener('change', function() {
+                anoAtual = parseInt(this.value);
+                atualizarTabela();
+                atualizarResumo();
+                atualizarCalculoAutomatico();
+                atualizarDashboard();
+                atualizarGraficosAnuais();
+            });
+            
+            // Formulário de ponto
+            document.getElementById('pontoForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                salvarRegistro();
+            });
+            
+            // Limpar formulário
+            document.getElementById('limparForm').addEventListener('click', function() {
+                document.getElementById('pontoForm').reset();
+                document.getElementById('horariosAdicionais').innerHTML = '';
+                const hoje = new Date();
+                const dataFormatada = hoje.toLocaleDateString('en-CA');
+                document.getElementById('data').value = dataFormatada;
+                mostrarToast('Formulário limpo', 'success');
+            });
+            
+            // Adicionar horário adicional
+            document.getElementById('adicionarHorario').addEventListener('click', function() {
+                adicionarHorario();
+            });
+            
+            // Adicionar desconto
+            document.getElementById('adicionarDesconto').addEventListener('click', function() {
+                adicionarCampoDesconto();
+            });
+            
+            // Calcular salário
+            document.getElementById('calcularSalario').addEventListener('click', function() {
+                calcularSalarioCompleto();
+            });
+            
+            // Atualizar cálculo automático quando valor da hora/aula mudar
+            document.getElementById('valorHoraAula').addEventListener('input', function() {
+                atualizarCalculoAutomatico();
+                salvarDadosUsuario();
+                atualizarDashboard();
+                atualizarGraficosAnuais();
+            });
+
+            document.getElementById('valorHoraExtra').addEventListener('input', function() {
+                atualizarCalculoAutomatico();
+                salvarDadosUsuario();
+                atualizarDashboard();
+                atualizarGraficosAnuais();
+            });
+            
+            // Imprimir relatório
+            document.getElementById('imprimirRelatorio').addEventListener('click', function() {
+                imprimirRelatorio();
+            });
+            
+            // Exportar dados
+            document.getElementById('exportBtn').addEventListener('click', function() {
+                exportarDados();
+            });
+            
+            // Importar dados
+            document.getElementById('importBtn').addEventListener('click', function() {
+                document.getElementById('importFile').click();
+            });
+            
+            document.getElementById('importFile').addEventListener('change', function(e) {
+                importarDados(e.target.files[0]);
+            });
+            
+            // Modo escuro
+            document.getElementById('darkModeToggle').addEventListener('click', function() {
+                toggleDarkMode();
+            });
+        }
+
+        // Adicionar horário adicional
+        function adicionarHorario() {
+            const horariosAdicionais = document.getElementById('horariosAdicionais');
+            const novoHorario = document.createElement('div');
+            novoHorario.className = 'grid grid-cols-2 gap-4';
+            novoHorario.innerHTML = `
+                <div>
+                    <input type="time" class="w-full border border-gray-300 rounded-lg px-3 py-2 entrada-adicional">
+                </div>
+                <div>
+                    <input type="time" class="w-full border border-gray-300 rounded-lg px-3 py-2 saida-adicional">
+                </div>
+            `;
+            horariosAdicionais.appendChild(novoHorario);
+        }
+
+        // Adicionar campo de desconto
+        function adicionarCampoDesconto(descricao = '', valor = '') {
+            const descontosContainer = document.getElementById('descontosContainer');
+            const novoDesconto = document.createElement('div');
+            novoDesconto.className = 'desconto-item grid grid-cols-3 gap-4 mb-2';
+            novoDesconto.innerHTML = `
+                <div class="col-span-2">
+                    <input type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 desconto-descricao" placeholder="Descrição do desconto" value="${descricao}">
+                </div>
+                <div class="flex">
+                    <input type="number" step="0.01" min="0" class="w-full border border-gray-300 rounded-lg px-3 py-2 desconto-valor" placeholder="Valor R$" value="${valor}">
+                    <button type="button" class="ml-2 bg-red-500 hover:bg-red-600 text-white px-2 rounded remover-desconto">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            descontosContainer.appendChild(novoDesconto);
+            
+            novoDesconto.querySelector('.remover-desconto').addEventListener('click', function() {
+                novoDesconto.remove();
+                salvarDadosUsuario();
+                mostrarToast('Desconto removido', 'success');
+            });
+            
+            novoDesconto.querySelectorAll('input').forEach(input => {
+                input.addEventListener('input', function() {
+                    salvarDadosUsuario();
+                });
+            });
+        }
+
+        // Salvar registro de ponto
+        function salvarRegistro() {
+            const data = document.getElementById('data').value;
+            const entrada = document.getElementById('entrada').value;
+            const saida = document.getElementById('saida').value;
+            const intervaloSaida = document.getElementById('intervaloSaida').value;
+            const intervaloRetorno = document.getElementById('intervaloRetorno').value;
+            const observacoes = document.getElementById('observacoes').value;
+            
+            if (!entrada || !saida) {
+                mostrarToast('Preencha pelo menos entrada e saída principais', 'error');
+                return;
+            }
+            
+            const dataObj = new Date(data);
+            const dataCorrigida = new Date(dataObj.getTime() + dataObj.getTimezoneOffset() * 60000);
+            const dataFormatada = dataCorrigida.toISOString().split('T')[0];
+            
+            // Coletar horários adicionais
+            const horariosAdicionais = [];
+            document.querySelectorAll('#horariosAdicionais > div').forEach(div => {
+                const entradaAdicional = div.querySelector('.entrada-adicional').value;
+                const saidaAdicional = div.querySelector('.saida-adicional').value;
+                
+                if (entradaAdicional && saidaAdicional) {
+                    horariosAdicionais.push({
+                        entrada: entradaAdicional,
+                        saida: saidaAdicional
+                    });
+                }
+            });
+            
+            // Criar objeto de registro
+            const registro = {
+                entrada,
+                saida,
+                intervaloSaida,
+                intervaloRetorno,
+                horariosAdicionais,
+                observacoes
+            };
+            
+            // Salvar registro
+            if (!registros[anoAtual]) {
+                registros[anoAtual] = {};
+            }
+            
+            if (!registros[anoAtual][mesAtual]) {
+                registros[anoAtual][mesAtual] = {};
+            }
+            
+            registros[anoAtual][mesAtual][dataFormatada] = registro;
+            
+            // Salvar dados do usuário
+            salvarDadosUsuario();
+            
+            // Atualizar interface
+            atualizarTabela();
+            atualizarResumo();
+            atualizarCalculoAutomatico();
+            atualizarDashboard();
+            atualizarGraficosAnuais();
+            
+            // Limpar formulário
+            document.getElementById('pontoForm').reset();
+            document.getElementById('horariosAdicionais').innerHTML = '';
+            
+            // Definir data atual
+            const hoje = new Date();
+            const hojeFormatada = hoje.toLocaleDateString('en-CA');
+            document.getElementById('data').value = hojeFormatada;
+            
+            mostrarToast('Registro salvo com sucesso!', 'success');
+        }
+
+        // [As demais funções de cálculo, tabelas, gráficos, etc. permanecem as mesmas...]
+        // ... [restante do código JavaScript] ...
+
+        // Atualizar tabela de registros
+        function atualizarTabela() {
+            const tbody = document.getElementById('registrosTbody');
+            tbody.innerHTML = '';
+            
+            if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="8" class="border border-gray-300 px-4 py-4 text-center text-gray-500">Nenhum registro encontrado para este mês</td>`;
+                tbody.appendChild(tr);
+                return;
+            }
+            
+            const registrosMes = registros[anoAtual][mesAtual];
+            const datas = Object.keys(registrosMes).sort();
+            
+            let totalSemanal = 0;
+            let semanaAtual = null;
+            
+            datas.forEach((data, index) => {
+                const registro = registrosMes[data];
+                const dataObj = new Date(data);
+                const semana = getWeekNumber(dataObj);
+                
+                if (semana !== semanaAtual) {
+                    totalSemanal = 0;
+                    semanaAtual = semana;
+                }
+                
+                const totalDiario = calcularTotalDiario(registro);
+                const horasExtras = calcularHorasExtras(totalDiario);
+                const valorDiario = calcularValorDiario(totalDiario, horasExtras);
+                
+                totalSemanal += totalDiario;
+                
+                const tr = document.createElement('tr');
+                tr.className = 'time-entry';
+                
+                if (totalDiario > 8 * 60 * 60 * 1000) {
+                    tr.classList.add('exceeded');
+                }
+                
+                let horariosFormatados = `${registro.entrada} - ${registro.saida}`;
+                
+                if (registro.intervaloSaida && registro.intervaloRetorno) {
+                    horariosFormatados += ` | ${registro.intervaloSaida} - ${registro.intervaloRetorno}`;
+                }
+                
+                if (registro.horariosAdicionais && registro.horariosAdicionais.length > 0) {
+                    registro.horariosAdicionais.forEach(horario => {
+                        horariosFormatados += ` | ${horario.entrada} - ${horario.saida}`;
+                    });
+                }
+                
+                const dataFormatada = formatarData(data);
+                
+                tr.innerHTML = `
+                    <td class="border border-gray-300 px-4 py-2">${dataFormatada}</td>
+                    <td class="border border-gray-300 px-4 py-2">${horariosFormatados}</td>
+                    <td class="border border-gray-300 px-4 py-2">${formatarTempo(totalDiario)}</td>
+                    <td class="border border-gray-300 px-4 py-2">${formatarTempo(totalSemanal)}</td>
+                    <td class="border border-gray-300 px-4 py-2">${formatarTempo(horasExtras)}</td>
+                    <td class="border border-gray-300 px-4 py-2">R$ ${valorDiario.toFixed(2)}</td>
+                    <td class="border border-gray-300 px-4 py-2">${registro.observacoes || '-'}</td>
+                    <td class="border border-gray-300 px-4 py-2 no-print">
+                        <button class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded excluir-registro" data-data="${data}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(tr);
+                
+                tr.querySelector('.excluir-registro').addEventListener('click', function() {
+                    const dataRegistro = this.getAttribute('data-data');
+                    if (confirm('Tem certeza que deseja excluir este registro?')) {
+                        delete registros[anoAtual][mesAtual][dataRegistro];
+                        salvarDadosUsuario();
+                        atualizarTabela();
+                        atualizarResumo();
+                        atualizarCalculoAutomatico();
+                        atualizarDashboard();
+                        atualizarGraficosAnuais();
+                        mostrarToast('Registro excluído com sucesso', 'success');
+                    }
+                });
+                
+                const proximaData = datas[index + 1];
+                if (!proximaData || getWeekNumber(new Date(proximaData)) !== semana) {
+                    const trTotal = document.createElement('tr');
+                    trTotal.className = 'bg-gray-100 font-bold';
+                    trTotal.innerHTML = `
+                        <td class="border border-gray-300 px-4 py-2" colspan="2">Total Semana ${semana}</td>
+                        <td class="border border-gray-300 px-4 py-2">${formatarTempo(totalSemanal)}</td>
+                        <td class="border border-gray-300 px-4 py-2"></td>
+                        <td class="border border-gray-300 px-4 py-2"></td>
+                        <td class="border border-gray-300 px-4 py-2"></td>
+                        <td class="border border-gray-300 px-4 py-2"></td>
+                        <td class="border border-gray-300 px-4 py-2 no-print"></td>
+                    `;
+                    tbody.appendChild(trTotal);
+                }
+            });
+        }
+
+        // Atualizar resumo do mês
+        function atualizarResumo() {
+            if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                document.getElementById('totalHoras').textContent = '00:00';
+                document.getElementById('salarioLiquido').textContent = 'R$ 0,00';
+                return;
+            }
+            
+            const registrosMes = registros[anoAtual][mesAtual];
+            const datas = Object.keys(registrosMes);
+            
+            let totalHoras = 0;
+            let totalHorasExtras = 0;
+            
+            datas.forEach(data => {
+                const registro = registrosMes[data];
+                const totalDiario = calcularTotalDiario(registro);
+                const horasExtras = calcularHorasExtras(totalDiario);
+                
+                totalHoras += totalDiario;
+                totalHorasExtras += horasExtras;
+            });
+            
+            const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
+            const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
+            
+            const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
+            const salarioLiquido = calcularSalarioLiquido(salarioBruto);
+            
+            document.getElementById('totalHoras').textContent = formatarTempo(totalHoras);
+            document.getElementById('salarioLiquido').textContent = `R$ ${salarioLiquido.toFixed(2)}`;
+            
+            atualizarGraficoHorasSemanais();
+        }
+
+        // Atualizar cálculo automático
+        function atualizarCalculoAutomatico() {
+            if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                document.getElementById('infoTotalHoras').textContent = '0h 0min';
+                document.getElementById('infoHorasExtras').textContent = '0h 0min';
+                document.getElementById('infoValorHora').textContent = 'R$ 0,00';
+                document.getElementById('infoSalarioBruto').textContent = 'R$ 0,00';
+                return;
+            }
+            
+            const registrosMes = registros[anoAtual][mesAtual];
+            const datas = Object.keys(registrosMes);
+            
+            let totalHoras = 0;
+            let totalHorasExtras = 0;
+            
+            datas.forEach(data => {
+                const registro = registrosMes[data];
+                const totalDiario = calcularTotalDiario(registro);
+                const horasExtras = calcularHorasExtras(totalDiario);
+                
+                totalHoras += totalDiario;
+                totalHorasExtras += horasExtras;
+            });
+            
+            const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
+            const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
+            
+            const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
+            
+            document.getElementById('infoTotalHoras').textContent = formatarTempo(totalHoras);
+            document.getElementById('infoHorasExtras').textContent = formatarTempo(totalHorasExtras);
+            document.getElementById('infoValorHora').textContent = `R$ ${valorHoraAula.toFixed(2)}`;
+            document.getElementById('infoSalarioBruto').textContent = `R$ ${salarioBruto.toFixed(2)}`;
+        }
+
+        // Atualizar dashboard
+        function atualizarDashboard() {
+            if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                document.getElementById('dashboardHorasMes').textContent = '00:00';
+                document.getElementById('dashboardSalarioMes').textContent = 'R$ 0,00';
+                document.getElementById('dashboardMediaSemanal').textContent = '00:00';
+                document.getElementById('dashboardHorasExtras').textContent = '00:00';
+                return;
+            }
+            
+            const registrosMes = registros[anoAtual][mesAtual];
+            const datas = Object.keys(registrosMes);
+            
+            let totalHoras = 0;
+            let totalHorasExtras = 0;
+            let semanas = new Set();
+            
+            datas.forEach(data => {
+                const registro = registrosMes[data];
+                const totalDiario = calcularTotalDiario(registro);
+                const horasExtras = calcularHorasExtras(totalDiario);
+                
+                totalHoras += totalDiario;
+                totalHorasExtras += horasExtras;
+                
+                semanas.add(getWeekNumber(new Date(data)));
+            });
+            
+            const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
+            const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
+            
+            const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
+            const salarioLiquido = calcularSalarioLiquido(salarioBruto);
+            
+            const mediaSemanal = semanas.size > 0 ? totalHoras / semanas.size : 0;
+            
+            document.getElementById('dashboardHorasMes').textContent = formatarTempo(totalHoras);
+            document.getElementById('dashboardSalarioMes').textContent = `R$ ${salarioLiquido.toFixed(2)}`;
+            document.getElementById('dashboardMediaSemanal').textContent = formatarTempo(mediaSemanal);
+            document.getElementById('dashboardHorasExtras').textContent = formatarTempo(totalHorasExtras);
+        }
+
+        // Calcular salário completo
+        function calcularSalarioCompleto() {
+            if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                mostrarToast('Não há registros para calcular o salário.', 'warning');
+                return;
+            }
+            
+            const registrosMes = registros[anoAtual][mesAtual];
+            const datas = Object.keys(registrosMes);
+            
+            let totalHoras = 0;
+            let totalHorasExtras = 0;
+            
+            datas.forEach(data => {
+                const registro = registrosMes[data];
+                const totalDiario = calcularTotalDiario(registro);
+                const horasExtras = calcularHorasExtras(totalDiario);
+                
+                totalHoras += totalDiario;
+                totalHorasExtras += horasExtras;
+            });
+            
+            const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
+            const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
+            
+            const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
+            const salarioLiquido = calcularSalarioLiquido(salarioBruto);
+            
+            let totalDescontos = 0;
+            document.querySelectorAll('.desconto-item').forEach(item => {
+                const valor = parseFloat(item.querySelector('.desconto-valor').value) || 0;
+                totalDescontos += valor;
+            });
+            
+            const salarioFinal = salarioLiquido - totalDescontos;
+            
+            let mensagem = `💰 RESUMO DO SALÁRIO\n\n`;
+            mensagem += `⏰ Total de Horas: ${formatarTempo(totalHoras)}\n`;
+            mensagem += `⚡ Horas Extras: ${formatarTempo(totalHorasExtras)}\n`;
+            mensagem += `💵 Valor Hora/Aula: R$ ${valorHoraAula.toFixed(2)}\n`;
+            mensagem += `📊 Salário Bruto: R$ ${salarioBruto.toFixed(2)}\n`;
+            mensagem += `💸 Salário Líquido: R$ ${salarioLiquido.toFixed(2)}\n`;
+            mensagem += `📉 Descontos: R$ ${totalDescontos.toFixed(2)}\n`;
+            mensagem += `🎯 SALÁRIO FINAL: R$ ${salarioFinal.toFixed(2)}`;
+            
+            alert(mensagem);
+        }
+
+        // Atualizar gráfico de horas semanais
+        function atualizarGraficoHorasSemanais() {
+            if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                return;
+            }
+            
+            const registrosMes = registros[anoAtual][mesAtual];
+            const datas = Object.keys(registrosMes).sort();
+            
+            const horasPorSemana = {};
+            
+            datas.forEach(data => {
+                const registro = registrosMes[data];
+                const totalDiario = calcularTotalDiario(registro);
+                const semana = getWeekNumber(new Date(data));
+                
+                if (!horasPorSemana[semana]) {
+                    horasPorSemana[semana] = 0;
+                }
+                
+                horasPorSemana[semana] += totalDiario;
+            });
+            
+            const semanas = Object.keys(horasPorSemana);
+            const horas = semanas.map(semana => horasPorSemana[semana] / (60 * 60 * 1000));
+            
+            const ctx = document.getElementById('horasSemanaisChart').getContext('2d');
+            
+            if (window.horasSemanaisChart) {
+                window.horasSemanaisChart.destroy();
+            }
+            
+            window.horasSemanaisChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: semanas.map(s => `Semana ${s}`),
+                    datasets: [{
+                        label: 'Horas Trabalhadas',
+                        data: horas,
+                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Horas'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Atualizar gráficos anuais
+        function atualizarGraficosAnuais() {
+            if (!registros[anoAtual]) {
+                return;
+            }
+            
+            const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const horasMensais = [];
+            const salariosMensais = [];
+            
+            const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
+            const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
+            
+            for (let mes = 0; mes < 12; mes++) {
+                let totalHoras = 0;
+                let totalHorasExtras = 0;
+                
+                if (registros[anoAtual][mes]) {
+                    const registrosMes = registros[anoAtual][mes];
+                    const datas = Object.keys(registrosMes);
+                    
+                    datas.forEach(data => {
+                        const registro = registrosMes[data];
+                        const totalDiario = calcularTotalDiario(registro);
+                        const horasExtras = calcularHorasExtras(totalDiario);
+                        
+                        totalHoras += totalDiario;
+                        totalHorasExtras += horasExtras;
+                    });
+                }
+                
+                horasMensais.push(totalHoras / (60 * 60 * 1000));
+                
+                const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
+                const salarioLiquido = calcularSalarioLiquido(salarioBruto);
+                salariosMensais.push(salarioLiquido);
+            }
+            
+            // Gráfico de horas mensais
+            const ctxHoras = document.getElementById('horasMensaisChart').getContext('2d');
+            
+            if (window.horasMensaisChart) {
+                window.horasMensaisChart.destroy();
+            }
+            
+            window.horasMensaisChart = new Chart(ctxHoras, {
+                type: 'line',
+                data: {
+                    labels: meses,
+                    datasets: [{
+                        label: 'Horas Trabalhadas',
+                        data: horasMensais,
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 2,
+                        tension: 0.3,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Horas'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Gráfico de salário mensal
+            const ctxSalario = document.getElementById('salarioMensalChart').getContext('2d');
+            
+            if (window.salarioMensalChart) {
+                window.salarioMensalChart.destroy();
+            }
+            
+            window.salarioMensalChart = new Chart(ctxSalario, {
+                type: 'bar',
+                data: {
+                    labels: meses,
+                    datasets: [{
+                        label: 'Salário Líquido (R$)',
+                        data: salariosMensais,
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Valor (R$)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Imprimir relatório
+        function imprimirRelatorio() {
+            if (!registros[anoAtual] || !registros[anoAtual][mesAtual]) {
+                mostrarToast('Não há registros para gerar relatório.', 'warning');
+                return;
+            }
+            
+            const registrosMes = registros[anoAtual][mesAtual];
+            const datas = Object.keys(registrosMes).sort();
+            
+            document.getElementById('periodoRelatorio').textContent = 
+                `Período: ${getNomeMes(mesAtual)} de ${anoAtual}`;
+            
+            const tbody = document.getElementById('relatorioTbody');
+            tbody.innerHTML = '';
+            
+            let totalHoras = 0;
+            let totalHorasExtras = 0;
+            let totalSemanal = 0;
+            let semanaAtual = null;
+            
+            datas.forEach((data, index) => {
+                const registro = registrosMes[data];
+                const dataObj = new Date(data);
+                const semana = getWeekNumber(dataObj);
+                
+                if (semana !== semanaAtual) {
+                    totalSemanal = 0;
+                    semanaAtual = semana;
+                }
+                
+                const totalDiario = calcularTotalDiario(registro);
+                const horasExtras = calcularHorasExtras(totalDiario);
+                const valorDiario = calcularValorDiario(totalDiario, horasExtras);
+                
+                totalHoras += totalDiario;
+                totalHorasExtras += horasExtras;
+                totalSemanal += totalDiario;
+                
+                let horariosFormatados = `${registro.entrada} - ${registro.saida}`;
+                
+                if (registro.intervaloSaida && registro.intervaloRetorno) {
+                    horariosFormatados += ` | ${registro.intervaloSaida} - ${registro.intervaloRetorno}`;
+                }
+                
+                if (registro.horariosAdicionais && registro.horariosAdicionais.length > 0) {
+                    registro.horariosAdicionais.forEach(horario => {
+                        horariosFormatados += ` | ${horario.entrada} - ${horario.saida}`;
+                    });
+                }
+                
+                const dataFormatada = formatarData(data);
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="border border-gray-400 px-4 py-2">${dataFormatada}</td>
+                    <td class="border border-gray-400 px-4 py-2">${horariosFormatados}</td>
+                    <td class="border border-gray-400 px-4 py-2">${formatarTempo(totalDiario)}</td>
+                    <td class="border border-gray-400 px-4 py-2">${formatarTempo(horasExtras)}</td>
+                    <td class="border border-gray-400 px-4 py-2">R$ ${valorDiario.toFixed(2)}</td>
+                    <td class="border border-gray-400 px-4 py-2">${formatarTempo(totalSemanal)}</td>
+                `;
+                
+                tbody.appendChild(tr);
+                
+                const proximaData = datas[index + 1];
+                if (!proximaData || getWeekNumber(new Date(proximaData)) !== semana) {
+                    const trTotal = document.createElement('tr');
+                    trTotal.className = 'bg-gray-200 font-bold';
+                    trTotal.innerHTML = `
+                        <td class="border border-gray-400 px-4 py-2" colspan="2">Total Semana ${semana}</td>
+                        <td class="border border-gray-400 px-4 py-2">${formatarTempo(totalSemanal)}</td>
+                        <td class="border border-gray-400 px-4 py-2"></td>
+                        <td class="border border-gray-400 px-4 py-2"></td>
+                        <td class="border border-gray-400 px-4 py-2"></td>
+                    `;
+                    tbody.appendChild(trTotal);
+                }
+            });
+            
+            const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
+            const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
+            
+            const salarioBruto = calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra);
+            const salarioLiquido = calcularSalarioLiquido(salarioBruto);
+            
+            document.getElementById('relatorioValorHora').textContent = `R$ ${valorHoraAula.toFixed(2)}`;
+            document.getElementById('relatorioTotalHoras').textContent = formatarTempo(totalHoras);
+            document.getElementById('relatorioHorasExtras').textContent = formatarTempo(totalHorasExtras);
+            document.getElementById('relatorioSalarioBruto').textContent = `R$ ${salarioBruto.toFixed(2)}`;
+            document.getElementById('relatorioSalarioLiquido').textContent = `R$ ${salarioLiquido.toFixed(2)}`;
+            
+            window.print();
+        }
+
+        // Exportar dados
+        function exportarDados() {
+            if (!usuarioAtual || !usuarios[usuarioAtual]) {
+                mostrarToast('Não há dados para exportar.', 'warning');
+                return;
+            }
+            
+            const dadosUsuario = usuarios[usuarioAtual];
+            const dadosExportar = {
+                usuario: usuarioAtual,
+                registros: dadosUsuario.registros,
+                configSalario: dadosUsuario.configSalario,
+                dataExportacao: new Date().toISOString()
+            };
+            
+            const dadosJSON = JSON.stringify(dadosExportar, null, 2);
+            const blob = new Blob([dadosJSON], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ponto_${usuarioAtual}_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            mostrarToast('Dados exportados com sucesso!', 'success');
+        }
+
+        // Importar dados
+        function importarDados(arquivo) {
+            if (!arquivo) return;
+            
+            const leitor = new FileReader();
+            leitor.onload = function(e) {
+                try {
+                    const dadosImportar = JSON.parse(e.target.result);
+                    
+                    if (dadosImportar.usuario !== usuarioAtual) {
+                        mostrarToast('Este arquivo não pertence ao usuário atual.', 'error');
+                        return;
+                    }
+                    
+                    if (!confirm('Isso substituirá todos os seus dados atuais. Continuar?')) {
+                        return;
+                    }
+                    
+                    usuarios[usuarioAtual].registros = dadosImportar.registros;
+                    usuarios[usuarioAtual].configSalario = dadosImportar.configSalario;
+                    
+                    localStorage.setItem('usuariosPonto', JSON.stringify(usuarios));
+                    
+                    carregarDadosUsuario();
+                    atualizarTabela();
+                    atualizarResumo();
+                    atualizarCalculoAutomatico();
+                    atualizarDashboard();
+                    atualizarGraficosAnuais();
+                    
+                    mostrarToast('Dados importados com sucesso!', 'success');
+                } catch (erro) {
+                    mostrarToast('Erro ao importar dados. Verifique se o arquivo é válido.', 'error');
+                    console.error(erro);
+                }
+            };
+            leitor.readAsText(arquivo);
+        }
+
+        // Alternar modo escuro
+        function toggleDarkMode() {
+            darkMode = !darkMode;
+            
+            if (darkMode) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('darkModeToggle').innerHTML = '<i class="fas fa-sun"></i> Modo Claro';
+                mostrarToast('Modo escuro ativado', 'success');
+            } else {
+                document.body.classList.remove('dark-mode');
+                document.getElementById('darkModeToggle').innerHTML = '<i class="fas fa-moon"></i> Modo Escuro';
+                mostrarToast('Modo claro ativado', 'success');
+            }
+            
+            localStorage.setItem('darkMode', darkMode);
+        }
+
+        // Funções auxiliares
+        function calcularTotalDiario(registro) {
+            let total = 0;
+            
+            if (registro.entrada && registro.saida) {
+                const entrada = new Date(`2000-01-01T${registro.entrada}`);
+                const saida = new Date(`2000-01-01T${registro.saida}`);
+                total += saida - entrada;
+            }
+            
+            if (registro.intervaloSaida && registro.intervaloRetorno) {
+                const saidaIntervalo = new Date(`2000-01-01T${registro.intervaloSaida}`);
+                const retornoIntervalo = new Date(`2000-01-01T${registro.intervaloRetorno}`);
+                total -= (retornoIntervalo - saidaIntervalo);
+            }
+            
+            if (registro.horariosAdicionais) {
+                registro.horariosAdicionais.forEach(horario => {
+                    if (horario.entrada && horario.saida) {
+                        const entrada = new Date(`2000-01-01T${horario.entrada}`);
+                        const saida = new Date(`2000-01-01T${horario.saida}`);
+                        total += saida - entrada;
+                    }
+                });
+            }
+            
+            return total;
+        }
+
+        function calcularHorasExtras(totalDiario) {
+            const jornadaPadrao = 8 * 60 * 60 * 1000;
+            return Math.max(0, totalDiario - jornadaPadrao);
+        }
+
+        function calcularValorDiario(totalDiario, horasExtras) {
+            const valorHoraAula = parseFloat(document.getElementById('valorHoraAula').value) || 0;
+            const valorHoraExtra = parseFloat(document.getElementById('valorHoraExtra').value) || 0;
+            
+            const horasNormais = totalDiario - horasExtras;
+            const valorHorasNormais = (horasNormais / (60 * 60 * 1000)) * valorHoraAula;
+            const valorHorasExtras = (horasExtras / (60 * 60 * 1000)) * valorHoraAula * (1 + valorHoraExtra / 100);
+            
+            return valorHorasNormais + valorHorasExtras;
+        }
+
+        function calcularSalarioBruto(totalHoras, totalHorasExtras, valorHoraAula, valorHoraExtra) {
+            const horasNormais = totalHoras - totalHorasExtras;
+            const valorHorasNormais = (horasNormais / (60 * 60 * 1000)) * valorHoraAula;
+            const valorHorasExtras = (totalHorasExtras / (60 * 60 * 1000)) * valorHoraAula * (1 + valorHoraExtra / 100);
+            
+            return valorHorasNormais + valorHorasExtras;
+        }
+
+        function calcularSalarioLiquido(salarioBruto) {
+            const inss = salarioBruto * 0.11;
+            const irrf = Math.max(0, salarioBruto - inss - 1903.98) * 0.075;
+            return salarioBruto - inss - irrf;
+        }
+
+        function formatarTempo(milissegundos) {
+            const horas = Math.floor(milissegundos / (1000 * 60 * 60));
+            const minutos = Math.floor((milissegundos % (1000 * 60 * 60)) / (1000 * 60));
+            return `${horas.toString().padStart(2, '0')}:${minutos.toString().padStart(2, '0')}`;
+        }
+
+        function formatarData(dataString) {
+            const data = new Date(dataString);
+            const dataCorrigida = new Date(data.getTime() + data.getTimezoneOffset() * 60000);
+            return dataCorrigida.toLocaleDateString('pt-BR');
+        }
+
+        function getWeekNumber(data) {
+            const primeiraSegunda = new Date(data.getFullYear(), 0, 1);
+            while (primeiraSegunda.getDay() !== 1) {
+                primeiraSegunda.setDate(primeiraSegunda.getDate() + 1);
+            }
+            
+            const diff = data - primeiraSegunda;
+            return Math.ceil((diff / (1000 * 60 * 60 * 24) + 1) / 7);
+        }
+
+        function getNomeMes(mes) {
+            const meses = [
+                'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+                'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+            ];
+            return meses[mes];
+        }
+
+        // Verificar modo escuro salvo
+        const darkModeSalvo = localStorage.getItem('darkMode');
+        if (darkModeSalvo === 'true') {
+            darkMode = true;
+            document.body.classList.add('dark-mode');
+            document.getElementById('darkModeToggle').innerHTML = '<i class="fas fa-sun"></i> Modo Claro';
+        }
+    </script>
+</body>
+</html>
